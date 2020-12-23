@@ -61,7 +61,6 @@ async def set_prefix(cmd, *prefix):
 
 
 
-
 def main():
     client.load_extension(f'modules.EventModule')
     client.run(token)

@@ -118,6 +118,10 @@ class EventModule(commands.Cog):
 
     async def setup(self, cmd, mode):
 
+        if not cmd.author.guild_permissions.administrator:
+            await cmd.send('You do not have permissions to execute this command')
+            return
+
         if mode:
             if mode[0] == 'category':
                 await self.setup_category(cmd)
@@ -748,9 +752,6 @@ class EventModule(commands.Cog):
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
-
-
-
 
         if payload.user_id == self.client.user.id:
             return
