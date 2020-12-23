@@ -1,0 +1,13 @@
+# ./docker-compose.yml
+version: '3.3'
+services:
+  bot:
+    build: .
+    container_name: incidentBot-discord
+    volumes:
+           - ./:/code
+
+    stdin_open: true
+    tty: true
+    restart: always
+
