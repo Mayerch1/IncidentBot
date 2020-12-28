@@ -252,7 +252,7 @@ class EventModule(commands.Cog):
 
         incident.race_name = r
 
-        q = await dm.send('State your drivers name in ACC:')
+        q = await dm.send('State your drivers in-game name:')
         r = await get_client_response(self.client, q, 60, cmd.author)
 
         if r is None:
@@ -600,8 +600,8 @@ class EventModule(commands.Cog):
             await dm.send(embed=incident_embed(incident, channel.name, incident.race_name))
 
 
-            await dm.send('Please correct the statement, if there are final adjustments.')
-            await dm.send('Ignore this messages if nothing has changed and the ticket will be closed in 60 seconds.\n')
+            await dm.send('If the outcome has changed since the steward statement was issued, please enter the outcome:')
+            await dm.send('Ignore this messages and the ticket will be closed in 60 seconds as shown above.\n')
 
 
             q1 = await dm.send('Please state the action taken in 1 short sentence.')

@@ -19,7 +19,7 @@ def get_guild_based_prefix(bot, msg: discord.Message):
 
 
 token = open('token.txt', 'r').read()
-client = commands.Bot(command_prefix=get_guild_based_prefix, description='Team Registrations for ACC')
+client = commands.Bot(command_prefix=get_guild_based_prefix, description='Report an incident to the stewards')
 
 
 
@@ -46,6 +46,7 @@ async def on_guild_remove(guild):
 
 
 @client.command(name='prefix', help = 'change the prefix')
+@commands.has_guild_permissions(administrator=True)
 @commands.guild_only()
 async def set_prefix(cmd, *prefix):
     if not prefix or prefix[0] == 'help':
