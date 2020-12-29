@@ -43,8 +43,12 @@ class EventModule(commands.Cog):
 
     async def _del_msg_list(self, channel, msg_ids: []):
         for m_id in msg_ids:
-            msg = await channel.fetch_message(m_id)
-            await msg.delete()
+            try:
+                msg = await channel.fetch_message(m_id)
+                await msg.delete()
+            except:
+                # ignore if msg is not existing
+                pass
 
 
     #################################################
@@ -206,7 +210,7 @@ class EventModule(commands.Cog):
             return
 
         dm = await cmd.author.create_dm()
-        await cmd.send('I\'ve send you a DM to continue with the ticket setup')
+        await cmd.send('I have sent you a DM to continue the ticket process.')
 
         if dm is None:
             return
@@ -357,7 +361,12 @@ class EventModule(commands.Cog):
         m1 = await channel.send('<@{:d}> Please upload the proof of the incident\n'.format(incident.victim.u_id))
 
         m2 = await channel.send('If possible you should provide the 1st person- and the chase- camera for both cars.\n')
-        m3 = await channel.send('The easiest way to upload your footage is https://streamable.com/\n')
+
+        embed = discord.Embed(title='Recommended Upload Solutions')
+        embed.add_field(name='Streamable', value = '[choose for fast and simple upload](https://streamable.com)', inline=False)
+        embed.add_field(name='Youtube', value = '[choose for more control over your upload](https://youtube.com)', inline=False)
+
+        m3 = await channel.send(embed=embed)
 
         # skip forwad emoji
         msg = await channel.send('React with ⏩ once you added all proof')
@@ -394,15 +403,21 @@ class EventModule(commands.Cog):
         await self._del_msg_list(channel, incident.cleanup_queue)
         incident.cleanup_queue = []
 
+        # fake a text message
+        # this will reset the state-machine watchdog
+        # otherwise it would trigger this message at each iteration, after it was aborted once
+        t = datetime.now()
+        incident.last_msg = t.timestamp()
+
 
         # save is required here, as next steps will require delay
         TinyConnector.update_guild(server)
 
 
 
-
-        q1 = await channel.send('{:s} Please @-tag the offender in this incidents'.format(victim.mention))
-        offender_mention = await get_client_response(self.client, q1, 250, victim, is_user_mention)
+        # 15 minutes time to tag offender
+        q1 = await channel.send('{:s} Please @-tag the offender in this incident'.format(victim.mention))
+        offender_mention = await get_client_response(self.client, q1, 900, victim, is_user_mention)
 
 
 
@@ -428,8 +443,9 @@ class EventModule(commands.Cog):
 
         else:
             q2 = await channel.send('Couldn\'t determin an offender. Please reinitiate the process with ⏩')
-            q3 = await channel.send('You can cancel this ticket with {:s}incident cancel'.format(server.prefix))
-            incident.cleanup_queue.extend([msg.id, q2.id])
+            await q2.add_reaction('⏩')
+            q3 = await channel.send('You can cancel this ticket with `{:s}incident cancel`'.format(server.prefix))
+            incident.cleanup_queue.extend([q2.id, q3.id])
 
 
         incident.cleanup_queue.append(q1.id)
@@ -686,7 +702,7 @@ class EventModule(commands.Cog):
 
 
 
-    @tasks.loop(minutes=1)
+    @tasks.loop(minutes=5)
     async def incident_timeout(self):
         t = datetime.now()
 
