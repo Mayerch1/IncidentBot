@@ -179,6 +179,7 @@ class EventModule(commands.Cog):
 
         await cmd.send('This incident is now marked as closed. It will be deleted soon.')
         incident.state = State.CLOSED_PHASE
+        incident.locked_time = datetime.now().timestamp()
 
 
         TinyConnector.update_guild(server)
