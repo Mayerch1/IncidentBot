@@ -8,7 +8,7 @@ from discord.ext import commands, tasks
 
 
 from lib.tinyConnector import TinyConnector
-from lib.data import Incident, Driver
+from lib.data import Incident, Driver, State
 
 
 from util.verboseErrors import VerboseErrors
@@ -161,6 +161,7 @@ class EventModule(commands.Cog):
 
         if not incident:
             await cmd.send('This command only works in an active incident channel')
+            return
 
 
         if cmd.author.id != incident.victim.u_id and not self._is_member_steward(cmd.author, server.stewards_id):
@@ -169,7 +170,7 @@ class EventModule(commands.Cog):
 
 
         # the victim cannot cancel the ticket anymore after completing the process
-        if cmd.author.id == incident.victim.u_id == incident.state >= 2:
+        if cmd.author.id == incident.victim.u_id and incident.state.value >= State.OFFENDER_STATEMENT.value:
             await cmd.send('You cannot cancel this ticket anymore')
             return
 
@@ -177,7 +178,7 @@ class EventModule(commands.Cog):
         # the stewards can always cancel a ticket
 
         await cmd.send('This incident is now marked as closed. It will be deleted soon.')
-        incident.state = 7
+        incident.state = State.CLOSED_PHASE
 
 
         TinyConnector.update_guild(server)
@@ -226,9 +227,11 @@ class EventModule(commands.Cog):
 
         incident = await self.incident_setup_channel(cmd, server, incident)
 
+
         # re-fetch guild, as it could have changed
         server = TinyConnector.get_guild(cmd.guild.id)
         server.active_incidents[incident.channel_id] = incident
+        server.incident_cnt += 1
         TinyConnector.update_guild(server)
 
 
@@ -303,8 +306,7 @@ class EventModule(commands.Cog):
     async def incident_setup_channel(self, cmd, server, incident):
 
         # create channel and ask user for more input
-        ch_name = 'Incident Ticket - {:d}'.format(
-            len(server.active_incidents) + 1)
+        ch_name = 'Incident Ticket - {:d}'.format(server.incident_cnt + 1)
         section = self.client.get_channel(server.incident_section_id)
 
         if section is None:
@@ -346,7 +348,7 @@ class EventModule(commands.Cog):
         server = TinyConnector.get_guild(guild.id)
         incident = server.active_incidents[incident_id]
 
-        incident.state += 1
+        incident.state  = State.VICTIM_PROOF
 
 
         # incident id is channel id
@@ -426,6 +428,11 @@ class EventModule(commands.Cog):
         incident = server.active_incidents[incident_id]
 
 
+        if incident.state == State.CLOSED_PHASE:
+            # the incident was closed in the mean time
+            return
+
+
         if offender_mention:
             # the validator guarantees a return with valid id
             offender_id = re.findall('@!\d+', offender_mention)[0][2:]
@@ -437,7 +444,7 @@ class EventModule(commands.Cog):
             await msg.add_reaction('⏩')
 
             # incr. state-machine on successfull offender-determination
-            incident.state += 1
+            incident.state = State.OFFENDER_STATEMENT
 
             incident.cleanup_queue.extend([msg.id, q2.id])
 
@@ -460,7 +467,7 @@ class EventModule(commands.Cog):
         server = TinyConnector.get_guild(guild.id)
         incident = server.active_incidents[incident_id]
 
-        incident.state += 1
+        incident.state = State.OFFENDER_PROOF
 
 
         # incident id is channel id
@@ -490,7 +497,7 @@ class EventModule(commands.Cog):
         server = TinyConnector.get_guild(guild.id)
         incident = server.active_incidents[incident_id]
 
-        incident.state += 1
+        incident.state = State.STEWARD_STATEMENT
 
 
         # incident id is channel id
@@ -509,8 +516,8 @@ class EventModule(commands.Cog):
         await embed_msg.add_reaction('❌')
 
 
-        q1 = await channel.send('<@&{:d}> please have a look at this incident and state your first judgement.'.format(server.stewards_id))
-        msg = await channel.send('React with ⏩ once you added your statement. You can allow both parties to react to your statement')
+        q1 = await channel.send('<@&{:d}> please have a look at this incident and state your judgement.'.format(server.stewards_id))
+        msg = await channel.send('React with ⏩ once the final steward statement is issued. You can allow both parties to respond to your statement')
 
         await msg.add_reaction('⏩')
 
@@ -527,7 +534,7 @@ class EventModule(commands.Cog):
         server = TinyConnector.get_guild(guild.id)
         incident = server.active_incidents[incident_id]
 
-        incident.state += 1
+        # incident.state += 1
 
 
         # incident id is channel id
@@ -541,11 +548,11 @@ class EventModule(commands.Cog):
         TinyConnector.update_guild(server)
 
 
-        q1 = await channel.send('<@&{:d}> please state the category of infringement which was judged here in 1 short sentence (e.g. \'causing a collision\', \'abuse of track limits\', ...)'.format(server.stewards_id))
+        q1 = await channel.send('<@&{:d}> please state the category of infringement which was judged in 1 short sentence (e.g. \'causing a collision\', \'abuse of track limits\', ...)'.format(server.stewards_id))
         category = await get_client_response(self.client, q1, 60)
 
-        q2 = await channel.send('<@&{:d}> please state the action taken in 1 short sentence (the punishment e.g. \'1st warning\', \'racing incident\', ...)'.format(server.stewards_id))
-        outcome = await get_client_response(self.client, q1, 60)
+        q2 = await channel.send('<@&{:d}> please state the action taken in 1 short sentence (e.g. \'1st warning\', \'racing incident\', ...)'.format(server.stewards_id))
+        outcome = await get_client_response(self.client, q2, 60)
 
 
         # re-fetch, as db could have changed
@@ -563,12 +570,12 @@ class EventModule(commands.Cog):
 
 
 
-    async def incident_steward_statement(self, guild, channel_id, incident_id):
+    async def incident_steward_end_statement(self, guild, channel_id, incident_id):
 
         server = TinyConnector.get_guild(guild.id)
         incident = server.active_incidents[incident_id]
 
-        incident.state += 1
+        incident.state = State.DISCUSSION_PHASE
 
 
         # incident id is channel id
@@ -598,7 +605,7 @@ class EventModule(commands.Cog):
         server = TinyConnector.get_guild(guild.id)
         incident = server.active_incidents[incident_id]
 
-        incident.state += 1
+        incident.state = State.CLOSED_PHASE
         incident.locked_time = datetime.now().timestamp()
 
         TinyConnector.update_guild(server)
@@ -620,7 +627,7 @@ class EventModule(commands.Cog):
             await dm.send('Ignore this messages and the ticket will be closed in 60 seconds as shown above.\n')
 
 
-            q1 = await dm.send('Please state the action taken in 1 short sentence.')
+            q1 = await dm.send('Please correct the action taken in 1 short sentence.')
             outcome = await get_client_response(self.client, q1, 60, closing_steward)
 
             if outcome:
@@ -637,7 +644,7 @@ class EventModule(commands.Cog):
             await statement_ch.send(embed = incident_embed(incident, channel.name, incident.race_name))
 
 
-        await channel.send('The ticket is closed, please do not interact with this channel anymore')
+        await channel.send('The ticket is closed, please do not interact with this channel anymore.')
 
 
 
@@ -680,8 +687,8 @@ class EventModule(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.author.id == self.client.user.id:
-            return
+
+        # explicitly count own messages
 
         if not message.guild:
             return
@@ -727,38 +734,38 @@ class EventModule(commands.Cog):
                     return
 
 
-                if incident.state == 0 and delta > timedelta(minutes=30):
+                if incident.state == State.VICTIM_STATEMENT and delta > timedelta(minutes=30):
                     await self.incident_victim_proof(guild, channel.id, incident.channel_id)
 
-                elif incident.state == 1 and delta > timedelta(minutes=30):
+                elif incident.state == State.VICTIM_PROOF and delta > timedelta(minutes=30):
                     # if this fails, the state-machine will not advance
                     # this will lead to continuous pinging of the victim (by design)
                     await self.incident_notify_offender(guild, channel.id, incident.channel_id)
 
                 # offender got 1 day for initial statement
-                elif incident.state == 2 and delta > timedelta(days=1):
+                elif incident.state == State.OFFENDER_STATEMENT and delta > timedelta(days=1):
                     await self.incident_offender_proof(guild, channel.id, incident.channel_id)
 
                 # further 2 hours for upload of proof
-                elif incident.state == 3 and delta > timedelta(hours=2):
+                elif incident.state == State.OFFENDER_PROOF and delta > timedelta(hours=2):
                     await self.incident_notify_stewards(guild, channel.id, incident.channel_id)
 
                 # the stewards got 2 days of reaction
-                elif incident.state == 4 and delta > timedelta(days=2):
+                elif incident.state == State.STEWARD_STATEMENT and delta > timedelta(days=2):
                     await self.incident_steward_sumup(guild, channel.id, incident.channel_id)
-                    await self.incident_steward_statement(guild, channel.id, incident.channel_id)
+                    await self.incident_steward_end_statement(guild, channel.id, incident.channel_id)
 
 
                 # currently state 4->6, as state 5 does not need user interaction
 
                 # the incident is auto-closed after 1 further day
-                elif incident.state == 6 and delta > timedelta(days=1):
+                elif incident.state == State.DISCUSSION_PHASE and delta > timedelta(days=1):
                     await self.incident_close_incident(guild, channel.id, incident.channel_id, None)
 
 
                 # state 7 is closed incident with no further interaction
                 # it will be deleted after a certain timedelta
-                elif incident.state == 7:
+                elif incident.state == State.CLOSED_PHASE:
                     # channel is deleted after 2 more days (for record)
                     delta = t - datetime.fromtimestamp(incident.locked_time)
                     if delta > timedelta(days=2):
@@ -797,30 +804,28 @@ class EventModule(commands.Cog):
         if payload.emoji.name == '⏩':
             # advance over state-machine
             # increment the incident state before call, as async method could delay and lead to altered database
-            if incident.state == 0 and payload.member.id == incident.victim.u_id:
+            if incident.state == State.VICTIM_STATEMENT and payload.member.id == incident.victim.u_id:
                 await self.incident_victim_proof(guild, channel.id, incident.channel_id)
 
-            elif incident.state == 1 and payload.member.id == incident.victim.u_id:
+            elif incident.state == State.VICTIM_PROOF and payload.member.id == incident.victim.u_id:
                 await self.incident_notify_offender(guild, channel.id, incident.channel_id)
 
-            elif incident.state == 2 and payload.member.id == incident.offender.u_id:
+            elif incident.state == State.OFFENDER_STATEMENT and payload.member.id == incident.offender.u_id:
                 await self.incident_offender_proof(guild, channel.id, incident.channel_id)
 
-            elif incident.state == 3 and payload.member.id == incident.offender.u_id:
+            elif incident.state == State.OFFENDER_PROOF and payload.member.id == incident.offender.u_id:
                 await self.incident_notify_stewards(guild, channel.id, incident.channel_id)
 
-            elif incident.state == 4 and self._is_member_steward(payload.member, server.stewards_id):
+            elif incident.state == State.STEWARD_STATEMENT and self._is_member_steward(payload.member, server.stewards_id):
                 await self.incident_steward_sumup(guild, channel.id, incident.channel_id)
-                await self.incident_steward_statement(guild, channel.id, incident.channel_id)
+                await self.incident_steward_end_statement(guild, channel.id, incident.channel_id)
 
-            # currently state 4->6, as state 5 does not need user interaction
 
             # state 7 is closed incident with no further interaction
             # it will be deleted after a certain timedelta
 
-
         elif payload.emoji.name == '🔒':
-            if incident.state == 6 and self._is_member_steward(payload.member, server.stewards_id):
+            if incident.state == State.DISCUSSION_PHASE and self._is_member_steward(payload.member, server.stewards_id):
                 await self.incident_close_incident(guild, channel.id, incident.channel_id, payload.member)
 
 
