@@ -261,8 +261,6 @@ class IncidentModule(commands.Cog):
 
         incident.victim.u_id = cmd.author.id
 
-        return incident
-
 
         q = await dm.send('State the Game- and Race-name:')
         r = await get_client_response(self.client, q, 60, cmd.author)
