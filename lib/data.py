@@ -83,7 +83,7 @@ def _json_to_incident(json):
     i.infringement = json['infringement']
     i.outcome = json['outcome']
     i.channel_id = int(json['channel_id'])
-    i.lap = int(json['lap'])
+    i.lap = json['lap']
     i.state = State(int(json['state']))
     i.last_msg = float(json['last_msg'])
     i.locked_time = float(json['locked_time'])

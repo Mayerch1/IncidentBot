@@ -10,7 +10,7 @@ def incident_embed(inc: Incident, title, description):
     embed.add_field(name='Victim', value='{:s} - {:d}'.format(inc.victim.name, inc.victim.number), inline=True)
     embed.add_field(name='Offender', value='{:s} - {:d}'.format(inc.offender.name, inc.offender.number), inline=True)
 
-    if inc.lap != 0:
+    if inc.lap and inc.lap != '-':
         embed.add_field(name='Lap number', value=inc.lap, inline=False)
 
     if inc.infringement:

@@ -20,9 +20,9 @@ from util.displayEmbeds import incident_embed
 class IncidentModule(commands.Cog):
 
     INC_HELP   = '```*incident <command>\n'\
-                 '\tcreate - open a new ticket [default]\n'\
-                 '\tcancel - abort an opened ticket (do not use for ticket closing)\n'\
-                 '\tsetup  - set some properties (use \'incident setup help\')```'
+                 '\t[@mention] - open a new ticket [default]\n'\
+                 '\tcancel     - abort an opened ticket (do not use for ticket closing)\n'\
+                 '\tsetup      - set some properties (use \'incident setup help\')```'
 
     SETUP_HELP = '```*incident setup <command>\n'\
                  '\tcategory - set the category where channels are created\n'\
@@ -189,19 +189,22 @@ class IncidentModule(commands.Cog):
     #################################################
     ## Incident Creation - Initial question on victim
     #################################################
-    async def incident(self, cmd):
+    async def incident(self, cmd, offender_id: int):
 
         perms = discord.Permissions()
         perms.manage_channels = True
         perms.send_messages = True
         perms.read_message_history = True
         perms.add_reactions = True
+        perms.manage_permissions = True
         perms.embed_links = True
 
-        if not await VerboseErrors.show_missing_perms("incident", perms, cmd.channel):
-            return
 
         server = TinyConnector.get_guild(cmd.guild.id)
+
+        if not server.incident_section_id:
+            await cmd.send('You need to setup a section for incidents first. Please ask an admin to use `{:s}incident setup`'.format(server.prefix))
+            return
 
         if not server.incident_section_id:
             await cmd.send('You need to setup a section for incidents first. Please ask an admin to use `{:s}incident setup`'.format(server.prefix))
@@ -210,6 +213,14 @@ class IncidentModule(commands.Cog):
         if not server.stewards_id:
             await cmd.send('No steward role is specified. Please ask an admin to use `{:s}incident setup'.format(server.prefix))
             return
+
+
+        section = self.client.get_channel(server.incident_section_id)
+
+        if not await VerboseErrors.show_missing_perms("incident", perms, section, channel_overwrite=True, text_alternative=cmd.channel):
+            return
+
+
 
         dm = await cmd.author.create_dm()
         await cmd.send('I have sent you a DM to continue the ticket process.')
@@ -226,6 +237,7 @@ class IncidentModule(commands.Cog):
             return
 
 
+        incident.offender.u_id = offender_id
         incident = await self.incident_setup_channel(cmd, server, incident)
 
 
@@ -234,8 +246,6 @@ class IncidentModule(commands.Cog):
         server.active_incidents[incident.channel_id] = incident
         server.incident_cnt += 1
         TinyConnector.update_guild(server)
-
-
 
 
 
@@ -250,6 +260,8 @@ class IncidentModule(commands.Cog):
         incident.offender = Driver()
 
         incident.victim.u_id = cmd.author.id
+
+        return incident
 
 
         q = await dm.send('State the Game- and Race-name:')
@@ -288,8 +300,8 @@ class IncidentModule(commands.Cog):
             return None
         incident.offender.number = int(r)
 
-        q = await dm.send('If possible, state the race lap, (0 if unspecified).')
-        r = await get_client_response(self.client, q, 60, cmd.author, lambda x: x.isdigit())
+        q = await dm.send('If possible, state the race lap and corner, (- if unspecified).')
+        r = await get_client_response(self.client, q, 60, cmd.author)
 
         if r is None:
             return None
@@ -308,14 +320,42 @@ class IncidentModule(commands.Cog):
 
         # create channel and ask user for more input
         ch_name = 'Incident Ticket - {:d}'.format(server.incident_cnt + 1)
+
         section = self.client.get_channel(server.incident_section_id)
+        steward_role = cmd.guild.get_role(server.stewards_id)
+
+        offender = await cmd.guild.fetch_member(incident.offender.u_id)
 
         if section is None:
             await cmd.send('Failed to create a channel, please ask an admin to re-set the category with `{:s}incident setup`'.format(server.prefix))
             return
 
+
         inc_channel = await cmd.guild.create_text_channel(ch_name, category=section)
         incident.channel_id = inc_channel.id
+
+
+        # ===================================
+        # THO ORDER OF THIS IS VERY IMPORTANT
+        # EVERYONE NEEDS TO BE SET LAST
+        # ===================================
+
+        await inc_channel.set_permissions(cmd.guild.me, manage_messages=True, read_messages=True, send_messages=True)
+
+        #try:
+        await inc_channel.set_permissions(steward_role, read_messages=True, send_messages=True)
+
+        #try:
+        await inc_channel.set_permissions(offender, read_messages=True, send_messages=False)
+
+        #try:
+        await inc_channel.set_permissions(cmd.message.author, read_messages=True, send_messages=True)
+
+
+        await inc_channel.set_permissions(cmd.guild.default_role, read_messages=False, send_messages=False)
+
+
+
 
         # ask the initial question, from then on, handling is done in events
 
@@ -384,14 +424,11 @@ class IncidentModule(commands.Cog):
 
     async def incident_notify_offender(self, guild, channel_id, incident_id):
 
-        def is_user_mention(input):
-            match = re.findall("@!\d+", input)
-            return (len(match) > 0)
-
-
         server = TinyConnector.get_guild(guild.id)
         incident = server.active_incidents[incident_id]
+
         victim = await guild.fetch_member(incident.victim.u_id)
+        offender = await guild.fetch_member(incident.offender.u_id)
 
         # do not change state-machine yet
         # next step requires a valid offender-id to be entered
@@ -417,46 +454,32 @@ class IncidentModule(commands.Cog):
         TinyConnector.update_guild(server)
 
 
-
-        # 15 minutes time to tag offender
-        q1 = await channel.send('{:s} Please @-tag the offender in this incident'.format(victim.mention))
-        offender_mention = await get_client_response(self.client, q1, 900, victim, is_user_mention)
-
-
-
-        # re-fetch the server-object, as it could have changed
-        server = TinyConnector.get_guild(guild.id)
-        incident = server.active_incidents[incident_id]
+        # # re-fetch the server-object, as it could have changed
+        # server = TinyConnector.get_guild(guild.id)
+        # incident = server.active_incidents[incident_id]
 
 
         if incident.state == State.CLOSED_PHASE:
             # the incident was closed in the mean time
             return
-
-
-        if offender_mention:
+        else:
             # the validator guarantees a return with valid id
-            offender_id = re.findall('@!\d+', offender_mention)[0][2:]
-            incident.offender.u_id = int(offender_id)
+            offender_id = incident.offender.u_id
 
-            q2 = await channel.send('{:s} Please state your point of view and any other comments you want to add'.format(offender_mention))
+            q2 = await channel.send('<@{:d}> Please state your point of view and any other comments you want to add'.format(offender_id))
             # skip forwad emoji
-            msg = await channel.send('React with ⏩ once you state your points')
+            msg = await channel.send('React with ⏩ once you stated your points')
             await msg.add_reaction('⏩')
 
             # incr. state-machine on successfull offender-determination
             incident.state = State.OFFENDER_STATEMENT
 
+
+            await channel.set_permissions(victim, read_messages=True, send_messages=False)
+            await channel.set_permissions(offender, read_messages=True, send_messages=True)
+
             incident.cleanup_queue.extend([msg.id, q2.id])
 
-        else:
-            q2 = await channel.send('Couldn\'t determin an offender. Please reinitiate the process with ⏩')
-            await q2.add_reaction('⏩')
-            q3 = await channel.send('You can cancel this ticket with `{:s}incident cancel`'.format(server.prefix))
-            incident.cleanup_queue.extend([q2.id, q3.id])
-
-
-        incident.cleanup_queue.append(q1.id)
 
         TinyConnector.update_guild(server)
 
@@ -481,7 +504,12 @@ class IncidentModule(commands.Cog):
 
         q1 = await channel.send('<@{:d}> upload additional proof if you have some\n'.format(incident.offender.u_id))
 
-        q2 = await channel.send('The easiest way to upload your footage is https://streamable.com/\n')
+        embed = discord.Embed(title='Recommended Upload Solutions')
+        embed.add_field(name='Streamable', value = '[choose for fast and simple upload](https://streamable.com)', inline=False)
+        embed.add_field(name='Youtube', value = '[choose for more control over your upload](https://youtube.com)', inline=False)
+
+        q2 = await channel.send(embed=embed)
+
         # skip forwad emoji
         msg = await channel.send('React with ⏩ once you added all proof')
         await msg.add_reaction('⏩')
@@ -500,18 +528,23 @@ class IncidentModule(commands.Cog):
 
         incident.state = State.STEWARD_STATEMENT
 
+        victim = await guild.fetch_member(incident.victim.u_id)
+        offender = await guild.fetch_member(incident.offender.u_id)
 
         # incident id is channel id
         channel = guild.get_channel(incident.channel_id)
-
 
         await self._del_msg_list(channel, incident.cleanup_queue)
         incident.cleanup_queue = []
 
 
+        await channel.set_permissions(victim, read_messages=True, send_messages=False)
+        await channel.set_permissions(offender, read_messages=True, send_messages=False)
 
-        embed = discord.Embed(title='Public poll', description='Vote if you think this incident should be punished or not')
-        embed.set_footer(text='This is only to get the general mood of the members. The stewards are in no way bound by this poll')
+
+
+        embed = discord.Embed(title='Poll', description='Vote if you think this incident should be punished or not')
+        embed.set_footer(text='This is only to get a general mood of the stewards. The decision is in no way bound by this poll')
         embed_msg = await channel.send(embed=embed)
         await embed_msg.add_reaction('✅')
         await embed_msg.add_reaction('❌')
@@ -521,7 +554,6 @@ class IncidentModule(commands.Cog):
         msg = await channel.send('React with ⏩ once the final steward statement is issued. You can allow both parties to respond to your statement')
 
         await msg.add_reaction('⏩')
-
 
 
         incident.cleanup_queue.extend([q1.id, msg.id])
@@ -578,6 +610,9 @@ class IncidentModule(commands.Cog):
 
         incident.state = State.DISCUSSION_PHASE
 
+        victim = await guild.fetch_member(incident.victim.u_id)
+        offender = await guild.fetch_member(incident.offender.u_id)
+
 
         # incident id is channel id
         channel = guild.get_channel(incident.channel_id)
@@ -598,6 +633,10 @@ class IncidentModule(commands.Cog):
         await channel.send('<@!{:d}>, <@!{:d}> please review the stewards statement. '\
                             'You can respond to the judgement until the incident is locked by a steward.'
                             .format(incident.victim.u_id, incident.offender.u_id))
+
+
+        await channel.set_permissions(victim, read_messages=True, send_messages=True)
+        await channel.set_permissions(offender, read_messages=True, send_messages=True)
 
 
 
@@ -669,6 +708,7 @@ class IncidentModule(commands.Cog):
         del server.active_incidents[incident_id]
         TinyConnector.update_guild(server)
 
+        # silent fail?
         await channel.delete()
 
 
@@ -844,14 +884,14 @@ class IncidentModule(commands.Cog):
     @commands.has_guild_permissions()
     async def incident_cmd(self, cmd, *mode):
 
-        if not mode or mode[0] == 'create':
-            await self.incident(cmd)
-
-        elif mode[0] == 'cancel':
+        if mode and mode[0] == 'cancel':
             await self.cancel(cmd, mode[1:])
 
-        elif mode[0] == 'setup':
+        elif mode and mode[0] == 'setup':
             await self.setup(cmd, mode[1:])
+
+        elif len(cmd.message.mentions) > 0:
+            await self.incident(cmd, cmd.message.mentions[0].id)
 
         else:
             await cmd.send(IncidentModule.INC_HELP)
