@@ -357,7 +357,7 @@ class IncidentModule(commands.Cog):
 
         # ask the initial question, from then on, handling is done in events
 
-        embed_msg = await inc_channel.send(embed=incident_embed(incident, ch_name, "Incident details"))
+        embed_msg = await inc_channel.send(embed=incident_embed(incident, ch_name, incident.race_name))
         await embed_msg.add_reaction('⏩')  # skip forward emoji
 
 
