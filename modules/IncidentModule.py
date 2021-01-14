@@ -338,19 +338,19 @@ class IncidentModule(commands.Cog):
         # EVERYONE NEEDS TO BE SET LAST
         # ===================================
 
-        await inc_channel.set_permissions(cmd.guild.me, manage_messages=True, read_messages=True, send_messages=True)
+        await inc_channel.set_permissions(cmd.guild.me, manage_messages=True, read_messages=True, send_messages=True, read_message_history=True)
 
         #try:
-        await inc_channel.set_permissions(steward_role, read_messages=True, send_messages=True)
+        await inc_channel.set_permissions(steward_role, read_messages=True, send_messages=True, read_message_history=True)
 
         #try:
-        await inc_channel.set_permissions(offender, read_messages=True, send_messages=False)
+        await inc_channel.set_permissions(offender, read_messages=True, send_messages=False, read_message_history=True)
 
         #try:
-        await inc_channel.set_permissions(cmd.message.author, read_messages=True, send_messages=True)
+        await inc_channel.set_permissions(cmd.message.author, read_messages=True, send_messages=True, read_message_history=True)
 
 
-        await inc_channel.set_permissions(cmd.guild.default_role, read_messages=False, send_messages=False)
+        await inc_channel.set_permissions(cmd.guild.default_role, read_messages=False, send_messages=False, read_message_history=False)
 
 
 
@@ -473,8 +473,8 @@ class IncidentModule(commands.Cog):
             incident.state = State.OFFENDER_STATEMENT
 
 
-            await channel.set_permissions(victim, read_messages=True, send_messages=False)
-            await channel.set_permissions(offender, read_messages=True, send_messages=True)
+            await channel.set_permissions(victim, read_messages=True, send_messages=False, read_message_history=True)
+            await channel.set_permissions(offender, read_messages=True, send_messages=True, read_message_history=True)
 
             incident.cleanup_queue.extend([msg.id, q2.id])
 
@@ -536,8 +536,8 @@ class IncidentModule(commands.Cog):
         incident.cleanup_queue = []
 
 
-        await channel.set_permissions(victim, read_messages=True, send_messages=False)
-        await channel.set_permissions(offender, read_messages=True, send_messages=False)
+        await channel.set_permissions(victim, read_messages=True, send_messages=False, read_message_history=True)
+        await channel.set_permissions(offender, read_messages=True, send_messages=False, read_message_history=True)
 
 
 
@@ -633,8 +633,8 @@ class IncidentModule(commands.Cog):
                             .format(incident.victim.u_id, incident.offender.u_id))
 
 
-        await channel.set_permissions(victim, read_messages=True, send_messages=True)
-        await channel.set_permissions(offender, read_messages=True, send_messages=True)
+        await channel.set_permissions(victim, read_messages=True, send_messages=True, read_message_history=True)
+        await channel.set_permissions(offender, read_messages=True, send_messages=True, read_message_history=True)
 
 
 
