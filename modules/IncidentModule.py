@@ -224,6 +224,7 @@ class IncidentModule(commands.Cog):
 
         dm = await cmd.author.create_dm()
         await cmd.send('I have sent you a DM to continue the ticket process.')
+        await cmd.send('This incident is now looked at by the stewards. There\'s no need for further discussions in this channel.')
 
         if dm is None:
             return
@@ -335,7 +336,7 @@ class IncidentModule(commands.Cog):
 
         # ===================================
         # THO ORDER OF THIS IS VERY IMPORTANT
-        # EVERYONE NEEDS TO BE SET LAST
+        # @EVERYONE NEEDS TO BE SET LAST
         # ===================================
 
         await inc_channel.set_permissions(cmd.guild.me, manage_messages=True, read_messages=True, send_messages=True, read_message_history=True)
@@ -580,10 +581,10 @@ class IncidentModule(commands.Cog):
 
 
         q1 = await channel.send('<@&{:d}> please state the category of infringement which was judged in 1 short sentence (e.g. \'causing a collision\', \'abuse of track limits\', ...)'.format(server.stewards_id))
-        category = await get_client_response(self.client, q1, 60)
+        category = await get_client_response(self.client, q1, 300)
 
         q2 = await channel.send('<@&{:d}> please state the action taken in 1 short sentence (e.g. \'1st warning\', \'racing incident\', ...)'.format(server.stewards_id))
-        outcome = await get_client_response(self.client, q2, 60)
+        outcome = await get_client_response(self.client, q2, 300)
 
 
         # re-fetch, as db could have changed
@@ -662,11 +663,11 @@ class IncidentModule(commands.Cog):
 
 
             await dm.send('If the outcome has changed since the steward statement was issued, please enter the outcome:')
-            await dm.send('Ignore this messages and the ticket will be closed in 60 seconds as shown above.\n')
+            await dm.send('Ignore this messages and the ticket will be closed in 3 minutes as shown above.\n')
 
 
             q1 = await dm.send('Please correct the action taken in 1 short sentence.')
-            outcome = await get_client_response(self.client, q1, 60, closing_steward)
+            outcome = await get_client_response(self.client, q1, 180, closing_steward)
 
             if outcome:
                 # re-fetch, as db could have changed
