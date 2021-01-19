@@ -209,7 +209,7 @@ async def get_client_response(client, message: discord.Message, timeout, author 
     """
     def check(m):
         if author is None:
-            return True
+            return m.channel.id == message.channel.id
         else:
             return m.channel.id == message.channel.id and m.author == author
 

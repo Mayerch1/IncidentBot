@@ -264,7 +264,7 @@ class IncidentModule(commands.Cog):
 
 
         q = await dm.send('State the Game- and Race-name:')
-        r = await get_client_response(self.client, q, 60, cmd.author)
+        r = await get_client_response(self.client, q, 300, cmd.author)
 
         if r is None:
             return
@@ -272,44 +272,45 @@ class IncidentModule(commands.Cog):
         incident.race_name = r
 
         q = await dm.send('State your drivers in-game name:')
-        r = await get_client_response(self.client, q, 60, cmd.author)
+        r = await get_client_response(self.client, q, 300, cmd.author)
 
         if r is None:
             return None
         incident.victim.name = r
 
         q = await dm.send('State your car number:')
-        r = await get_client_response(self.client, q, 60, cmd.author, lambda x: x.isdigit())
+        r = await get_client_response(self.client, q, 300, cmd.author, lambda x: x.isdigit())
 
         if r is None:
             return None
         incident.victim.number = int(r)
 
         q = await dm.send('State the other drivers name:')
-        r = await get_client_response(self.client, q, 60, cmd.author)
+        r = await get_client_response(self.client, q, 300, cmd.author)
 
         if r is None:
             return None
         incident.offender.name = r
 
         q = await dm.send('State the other drivers number:')
-        r = await get_client_response(self.client, q, 60, cmd.author, lambda x: x.isdigit())
+        r = await get_client_response(self.client, q, 300, cmd.author, lambda x: x.isdigit())
 
         if r is None:
             return None
         incident.offender.number = int(r)
 
         q = await dm.send('If possible, state the race lap and corner, (- if unspecified).')
-        r = await get_client_response(self.client, q, 60, cmd.author)
+        r = await get_client_response(self.client, q, 300, cmd.author)
 
         if r is None:
             return None
         incident.lap = r
 
+        await dm.send('Here\'s a summary of the incident. Please confirm ✅ or cancel ❌ the ticket.')
         embed_msg = await dm.send(embed=incident_embed(incident, "Event details", incident.race_name))
 
-        if not await wait_confirm_deny(self.client, embed_msg, 60, cmd.author):
-            await dm.send('Cancelling ticket')
+        if not await wait_confirm_deny(self.client, embed_msg, 300, cmd.author):
+            await dm.send('Cancelling ticket. You can start again by reinvoking the command.')
             return None
 
         return incident
