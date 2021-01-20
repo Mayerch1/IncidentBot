@@ -20,8 +20,8 @@ from util.displayEmbeds import incident_embed
 class IncidentModule(commands.Cog):
 
     INC_HELP   = '```*incident <command>\n'\
-                 '\t[@mention] - open a new ticket [default]\n'\
-                 '\tcancel     - abort an opened ticket (do not use for ticket closing)\n'\
+                 '\t[@mention] - open a new ticket\n'\
+                 '\tcancel     - abort an opened ticket (do not use for norma ticket closing)\n'\
                  '\tsetup      - set some properties (use \'incident setup help\')```'
 
     SETUP_HELP = '```*incident setup <command>\n'\
@@ -625,11 +625,13 @@ class IncidentModule(commands.Cog):
         TinyConnector.update_guild(server)
 
 
-        msg = await channel.send('<@&{:d}> you can close the incident at any point by reacting with 🔒'.format(server.stewards_id))
-        await msg.add_reaction('🔒')
+        msg = await channel.send('<@&{:d}> you can close (🔒)  the incident at any point or modify the outcome (🔧) by reacting to it.'.format(server.stewards_id))
 
 
-        await channel.send(embed=incident_embed(incident, channel.name, incident.race_name))
+        eb = await channel.send(embed=incident_embed(incident, channel.name, incident.race_name))
+        await eb.add_reaction('🔒')
+        await eb.add_reaction('🔧')
+
         await channel.send('<@!{:d}>, <@!{:d}> please review the stewards statement. '\
                             'You can respond to the judgement until the incident is locked by a steward.'
                             .format(incident.victim.u_id, incident.offender.u_id))
@@ -640,7 +642,60 @@ class IncidentModule(commands.Cog):
 
 
 
-    async def incident_close_incident(self, guild, channel_id, incident_id, closing_steward = None):
+    async def incident_modify_outcome(self, guild, channel_id, incident_id, editing_steward):
+
+        server = TinyConnector.get_guild(guild.id)
+        incident = server.active_incidents[incident_id]
+
+        # incident id is channel id
+        channel = guild.get_channel(incident.channel_id)
+
+
+
+        await channel.send('{:s} please watch your DMs to modify this ticket'.format(editing_steward.mention))
+
+        dm = await editing_steward.create_dm()
+        await dm.send(embed=incident_embed(incident, channel.name, incident.race_name))
+
+
+        await dm.send('Here you can correct the infringement and outcome of the ticket. Ignore this messages if you reacted by accident.\n')
+
+
+        q1 = await dm.send('Please correct the infringement (type `-` if it didn\'t change)')
+        infringement = await get_client_response(self.client, q1, 300, editing_steward)
+
+        q1 = await dm.send('Please correct the outcome (type `-` if it didn\'t change)')
+        outcome = await get_client_response(self.client, q1, 300, editing_steward)
+
+
+
+        # re-fetch, as db could have changed
+        # only assign if outcome has changed
+        server = TinyConnector.get_guild(guild.id)
+        incident = server.active_incidents[incident_id]
+        is_modified = False
+
+        if infringement and infringement != '-':
+            incident.infringement = infringement
+            is_modified = True
+
+        if outcome and outcome != '-':
+            incident.outcome = outcome
+            is_modified = True
+
+
+        if is_modified:
+            TinyConnector.update_guild(server)
+
+            await dm.send('Done')
+            await channel.send(embed=incident_embed(incident, channel.name, incident.race_name))
+        else:
+            await dm.send('No modification performed.')
+
+
+
+
+    async def incident_close_incident(self, guild, channel_id, incident_id):
 
         server = TinyConnector.get_guild(guild.id)
         incident = server.active_incidents[incident_id]
@@ -653,30 +708,6 @@ class IncidentModule(commands.Cog):
 
         # incident id is channel id
         channel = guild.get_channel(incident.channel_id)
-
-
-        if closing_steward:
-
-            await channel.send('{:s} please watch your DMs to close this ticket'.format(closing_steward.mention))
-
-            dm = await closing_steward.create_dm()
-            await dm.send(embed=incident_embed(incident, channel.name, incident.race_name))
-
-
-            await dm.send('If the outcome has changed since the steward statement was issued, please enter the outcome:')
-            await dm.send('Ignore this messages and the ticket will be closed in 3 minutes as shown above.\n')
-
-
-            q1 = await dm.send('Please correct the action taken in 1 short sentence.')
-            outcome = await get_client_response(self.client, q1, 180, closing_steward)
-
-            if outcome:
-                # re-fetch, as db could have changed
-                # only assign if outcome has changed
-                server = TinyConnector.get_guild(guild.id)
-                incident = server.active_incidents[incident_id]
-                incident.outcome = outcome
-                TinyConnector.update_guild(server)
 
 
         if server.statement_ch_id:
@@ -862,16 +893,17 @@ class IncidentModule(commands.Cog):
                 await self.incident_steward_end_statement(guild, channel.id, incident.channel_id)
 
 
-            # state 7 is closed incident with no further interaction
-            # it will be deleted after a certain timedelta
-
         elif payload.emoji.name == '🔒':
             if incident.state == State.DISCUSSION_PHASE and self._is_member_steward(payload.member, server.stewards_id):
-                await self.incident_close_incident(guild, channel.id, incident.channel_id, payload.member)
+                await self.incident_close_incident(guild, channel.id, incident.channel_id)
+
+        elif payload.emoji.name == '🔧':
+            if incident.state == State.DISCUSSION_PHASE and self._is_member_steward(payload.member, server.stewards_id):
+                await self.incident_modify_outcome(guild, channel.id, incident.channel_id, payload.member)
 
 
-            # state 7 is closed incident with no further interaction
-            # it will be deleted after a certain timedelta
+        # state 7 is closed incident with no further interaction
+        # it will be deleted after a certain timedelta
 
 
 
