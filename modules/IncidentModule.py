@@ -12,7 +12,7 @@ from lib.data import Incident, Driver, State
 
 
 from util.verboseErrors import VerboseErrors
-from util.interaction import ack_message, guess_target_section, guess_target_text, get_client_response, wait_confirm_deny
+from util.interaction import ack_message, guess_target_section, guess_target_text, get_client_response, get_client_reaction, wait_confirm_deny
 
 from util.displayEmbeds import incident_embed
 
@@ -239,7 +239,7 @@ class IncidentModule(commands.Cog):
 
 
         incident.offender.u_id = offender_id
-        incident = await self.incident_setup_channel(cmd, server, incident)
+        incident = await self.incident_setup_channel(cmd, incident)
 
 
         # re-fetch guild, as it could have changed
@@ -250,12 +250,13 @@ class IncidentModule(commands.Cog):
 
 
 
+    async def incident_flow_raw(self, cmd, dm):
+        """This holds the answer-response flow of setting up the incident with its starting information
+           There's no further user-information or summup etc
 
-    async def incident_setup_dm(self, cmd, dm):
-        embed = discord.Embed(title='New Incident Ticket',
-                              description='Please answer the following questions or ignore me to cancel the ticket.')
-        await dm.send(embed=embed)
-
+        Returns:
+            [type]: [the created incident, might hold None fields, but is never None itself]
+        """
         incident = Incident()
         incident.victim = Driver()
         incident.offender = Driver()
@@ -306,17 +307,58 @@ class IncidentModule(commands.Cog):
             return None
         incident.lap = r
 
-        await dm.send('Here\'s a summary of the incident. Please confirm ✅ or cancel ❌ the ticket.')
-        embed_msg = await dm.send(embed=incident_embed(incident, "Event details", incident.race_name))
-
-        if not await wait_confirm_deny(self.client, embed_msg, 300, cmd.author):
-            await dm.send('Cancelling ticket. You can start again by reinvoking the command.')
-            return None
-
         return incident
 
 
-    async def incident_setup_channel(self, cmd, server, incident):
+
+    async def incident_setup_dm(self, cmd, dm):
+
+        embed = discord.Embed(title='New Incident Ticket',
+                              description='Please answer the following questions or ignore me if you do not want to proceed.\n'\
+                                            'At the end of this process you\'ll get the chance to review or cancel the ticket.\n'\
+                                            'You do not need to create a new ticket if you made a typo.')
+
+        await dm.send(embed=embed)
+
+
+
+        incident = await self.incident_flow_raw(cmd, dm)
+
+
+
+        await dm.send('Here\'s a summary of the incident. Please confirm ✅ or cancel ❌ the ticket.')
+        await dm.send('You can edit the ticket by reacting with 🔧')
+        embed_msg = await dm.send(embed=incident_embed(incident, "Event details", incident.race_name))
+
+
+        abort_loop = False
+        while not abort_loop:
+
+            reaction = await get_client_reaction(self.client, embed_msg, 300, cmd.author, ['✅', '❌', '🔧'])
+
+            if reaction is None or reaction == '❌':
+                await dm.send('Cancelling ticket. You can start again by reinvoking the command.')
+                incident = None
+                abort_loop = True
+            elif reaction == '🔧':
+                await dm.send('Correcting incident fields. You can copy-paste the fields you do not want to change')
+                incident = await self.incident_flow_raw(cmd, dm)
+                embed_msg = await dm.send(embed=incident_embed(incident, "Event details", incident.race_name))
+            elif reaction == '✅':
+                await dm.send('You completed the ticket initialization. Please head back to the server to enter the incident details.')
+                await dm.send('I tagged you in the appropriate incident channel.')
+                abort_loop = True
+
+
+        # may be None if it was cancelled
+        return incident
+
+
+
+    async def incident_setup_channel(self, cmd, incident):
+
+        # need update for incident number, otherwise concurrent access might break sequential numbering
+        server = TinyConnector.get_guild(cmd.guild.id)
 
         # create channel and ask user for more input
         ch_name = 'Incident Ticket - {:d}'.format(server.incident_cnt + 1)
@@ -688,7 +730,9 @@ class IncidentModule(commands.Cog):
             TinyConnector.update_guild(server)
 
             await dm.send('Done')
-            await channel.send(embed=incident_embed(incident, channel.name, incident.race_name))
+            eb = await channel.send(embed=incident_embed(incident, channel.name, incident.race_name))
+            await eb.add_reaction('🔒')
+            await eb.add_reaction('🔧')
         else:
             await dm.send('No modification performed.')
 
@@ -832,7 +876,7 @@ class IncidentModule(commands.Cog):
 
                 # the incident is auto-closed after 1 further day
                 elif incident.state == State.DISCUSSION_PHASE and delta > timedelta(days=1):
-                    await self.incident_close_incident(guild, channel.id, incident.channel_id, None)
+                    await self.incident_close_incident(guild, channel.id, incident.channel_id)
 
 
                 # state 7 is closed incident with no further interaction

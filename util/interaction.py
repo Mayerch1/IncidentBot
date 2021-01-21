@@ -168,32 +168,72 @@ async def wait_confirm_deny(client, message: discord.Message, timeout, author):
         true if hook  selected,
         false if cross selected,
         None if timeout
+    """
 
+    reaction = await get_client_reaction(client, message, timeout, author, ['✅', '❌'])
+
+    if reaction == '✅':
+        return True
+    elif reaction == '❌':
+        return False
+    else:
+        return None
+
+
+
+async def get_client_reaction(client, message: discord.Message, timeout, author = None, emoji_whitelist = []):
+    """Add all reactions in whitelist to message.
+       Returns the first reaction the author reacts with.
+       Removes all reactions after user has reacted.
+
+    Args:
+        client ([type]): bot client
+        message (discord.Message): message for reaction
+        timeout ([type]):
+        author ([type]): user which is allowed to react
+        emoji_whitelist: all accepted emojis, if empty allow all emojis
+
+    Return:
+        the reacted emoji
+        None if timeout
     """
 
     def check(reaction, user):
-        if (reaction.emoji == '✅' or reaction.emoji == '❌') and reaction.message.channel.id == message.channel.id and user.id == author.id:
+        if ((not emoji_whitelist) or  reaction.emoji in emoji_whitelist) \
+            and reaction.message.channel.id == message.channel.id and user.id == author.id:
+
             return True
         return False
 
-    await message.add_reaction('✅')
-    await message.add_reaction('❌')
+    for emoji in emoji_whitelist:
+        try:
+            await message.add_reaction(emoji)
+        except discord.errors.HTTPException:
+            continue
+
 
     try:
         reaction = await client.wait_for('reaction_add', check=check, timeout=timeout)
     except asyncio.exceptions.TimeoutError:
-        await message.remove_reaction('✅', client.user)
-        await message.remove_reaction('❌', client.user)
+        for emoji in emoji_whitelist:
+            try:
+                await message.remove_reaction(emoji, client.user)
+            except discord.errors.HTTPException:
+                continue
+
+
         await message.add_reaction('⏲')
         return None
 
 
-    if reaction[0].emoji == '✅':
-        await message.remove_reaction('❌', client.user)
-        return True
-    elif reaction[0].emoji == '❌':
-        await message.remove_reaction('✅', client.user)
-        return False
+    for emoji in emoji_whitelist:
+        if emoji != reaction[0].emoji:
+            try:
+                await message.remove_reaction(emoji, client.user)
+            except discord.errors.HTTPException:
+                continue
+
+    return reaction[0].emoji
 
 
 async def get_client_response(client, message: discord.Message, timeout, author = None, validation_fnc = None):
