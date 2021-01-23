@@ -385,20 +385,36 @@ class IncidentModule(commands.Cog):
         # @EVERYONE NEEDS TO BE SET LAST
         # ===================================
 
-        await inc_channel.set_permissions(cmd.guild.me, manage_messages=True, read_messages=True, send_messages=True, read_message_history=True)
+        try:
+            await inc_channel.set_permissions(cmd.guild.me, manage_messages=True, read_messages=True, send_messages=True, read_message_history=True)
+        except Exception as e:
+            print('bot permissions:')
+            print(e)
 
-        #try:
-        await inc_channel.set_permissions(steward_role, read_messages=True, send_messages=True, read_message_history=True)
+        try:
+            await inc_channel.set_permissions(steward_role, read_messages=True, send_messages=True, read_message_history=True)
+        except Exception as e:
+            print('steward permission:')
+            print(e)
 
-        #try:
-        await inc_channel.set_permissions(offender, read_messages=True, send_messages=False, read_message_history=True)
+        try:
+            await inc_channel.set_permissions(offender, read_messages=True, send_messages=False, read_message_history=True)
+        except Exception as e:
+            print('offender permissions:')
+            print(e)
 
-        #try:
-        await inc_channel.set_permissions(cmd.message.author, read_messages=True, send_messages=True, read_message_history=True)
+        try:
+            await inc_channel.set_permissions(cmd.message.author, read_messages=True, send_messages=True, read_message_history=True)
+        except Exception as e:
+            print('author permissions:')
+            print(e)
 
 
-        await inc_channel.set_permissions(cmd.guild.default_role, read_messages=False, send_messages=False, read_message_history=False)
-
+        try:
+            await inc_channel.set_permissions(cmd.guild.default_role, read_messages=False, send_messages=False, read_message_history=False)
+        except Exception as e:
+            print('everyone permissions:')
+            print(e)
 
 
 
