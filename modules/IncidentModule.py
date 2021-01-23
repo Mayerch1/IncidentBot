@@ -268,7 +268,7 @@ class IncidentModule(commands.Cog):
         r = await get_client_response(self.client, q, 300, cmd.author)
 
         if r is None:
-            return
+            return None
 
         incident.race_name = r
 
@@ -324,6 +324,9 @@ class IncidentModule(commands.Cog):
 
         incident = await self.incident_flow_raw(cmd, dm)
 
+        if incident is None:
+            await dm.send('Ticket cancelled. You didn\'t fill in the answers fast enough. You can invoke the command again to start a new ticket.')
+            return None
 
 
         await dm.send('Here\'s a summary of the incident. Please confirm ✅ or cancel ❌ the ticket.')
