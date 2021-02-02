@@ -914,7 +914,7 @@ class IncidentModule(commands.Cog):
                     await self.incident_notify_stewards(guild, channel.id, incident.channel_id)
 
                 # the stewards got 2 days of reaction
-                elif incident.state == State.STEWARD_STATEMENT and delta > timedelta(days=2):
+                elif incident.state == State.STEWARD_STATEMENT and delta > timedelta(days=4):
                     await self.incident_steward_sumup(guild, channel.id, incident.channel_id)
                     await self.incident_steward_end_statement(guild, channel.id, incident.channel_id)
 
