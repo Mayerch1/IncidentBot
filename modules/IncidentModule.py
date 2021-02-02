@@ -313,8 +313,13 @@ class IncidentModule(commands.Cog):
 
     async def incident_setup_dm(self, cmd, dm):
 
+        if os.path.exists('modules/disclaimer.txt'):
+            with open('modules/disclaimer.txt', 'r') as f:
+                await dm.send(' '.join(f.readlines()))
+
+
         embed = discord.Embed(title='New Incident Ticket',
-                              description='Please answer the following questions or ignore me if you do not want to proceed.\n'\
+                              description='Please answer the following questions and ONLY the following questions.\n'\
                                             'At the end of this process you\'ll get the chance to review or cancel the ticket.\n'\
                                             'You do not need to create a new ticket if you made a typo.')
 
@@ -331,7 +336,7 @@ class IncidentModule(commands.Cog):
 
         await dm.send('Here\'s a summary of the incident. Please confirm ✅ or cancel ❌ the ticket.')
         await dm.send('You can edit the ticket by reacting with 🔧')
-        embed_msg = await dm.send(embed=incident_embed(incident, "Event details", incident.race_name))
+        embed_msg = await dm.send(embed=incident_embed(incident, "Incident details", incident.race_name))
 
 
         abort_loop = False

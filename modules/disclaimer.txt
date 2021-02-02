@@ -1,0 +1,16 @@
+**__An example of how we would preferably see reports:__**
+
+**-__ONE__ incident per report!**
+**-No footage from the reporting driver, no incident to judge**
+-Provide a bit of lead-in (10s or so) so we can understand the situation.
+-Both drivers' chase cams should be **mandatory**.
+-If it is an ACC/iRacing clip, turn the pedal inputs hud on. If it is another game, provide 1st person so we can see the rev counter instead.
+-Beyond that, additional PoVs are welcome if you think they help us better understand the incident.
+
+Plenty little details help us better judge an incident, but image quality is crucial, so please stop with the phone recordings, as that only makes our job harder.
+Your GPUs have internal recording software and the OS comes with Windows Video Editor for basic cutting and pasting of clips.
+We prefer youtube uploads since it gives us playback speed control, but Streamable is fine.
+
+Thank you for cooperating. :slight_smile:
+
+https://youtu.be/zL94E_IWgLk
