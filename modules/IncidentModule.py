@@ -339,6 +339,12 @@ class IncidentModule(commands.Cog):
 
             reaction = await get_client_reaction(self.client, embed_msg, 300, cmd.author, ['✅', '❌', '🔧'])
 
+            # give the author a second chance
+            if reaction is None:
+                await dm.send('If you do not confirm this ticket, it will be aborted in 5 minutes.')
+                reaction = await get_client_reaction(self.client, embed_msg, 300, cmd.author, ['✅', '❌', '🔧'])
+
+
             if reaction is None or reaction == '❌':
                 await dm.send('Cancelling ticket. You can start again by reinvoking the command.')
                 incident = None
@@ -465,25 +471,26 @@ class IncidentModule(commands.Cog):
         m1 = await channel.send('<@{:d}> Please upload the proof of the incident\n'.format(incident.victim.u_id))
 
         m2 = await channel.send('If possible you should provide the 1st person- and the chase- camera for both cars.\n')
+        m3 = await channel.send('If you do not add any proof, this ticket might be closed without further notice.')
 
         embed = discord.Embed(title='Recommended Upload Solutions')
         embed.add_field(name='Streamable', value = '[choose for fast and simple upload](https://streamable.com)', inline=False)
         embed.add_field(name='Youtube', value = '[choose for more control over your upload](https://youtube.com)', inline=False)
 
-        m3 = await channel.send(embed=embed)
+        m4 = await channel.send(embed=embed)
 
         # skip forwad emoji
         msg = await channel.send('React with ⏩ once you added all proof')
         await msg.add_reaction('⏩')
 
 
-        incident.cleanup_queue.extend([m1.id, m2.id, m3.id, msg.id])
+        incident.cleanup_queue.extend([m1.id, m2.id, m3.id, m4.id, msg.id])
 
         TinyConnector.update_guild(server)
 
 
 
-    async def incident_notify_offender(self, guild, channel_id, incident_id):
+    async def incident_notify_offender(self, guild, channel_id, incident_id, check_proof_exists):
 
         server = TinyConnector.get_guild(guild.id)
         incident = server.active_incidents[incident_id]
@@ -498,6 +505,17 @@ class IncidentModule(commands.Cog):
 
         # incident id is channel id
         channel = guild.get_channel(incident.channel_id)
+
+        if check_proof_exists:
+            async for message in channel.history(limit=1):
+                if not message.author.id == incident.victim.u_id:
+                    m1 = await channel.send('Are you sure you don\'t want to add any proof?\nThe incident might get cancelled if no sufficient evidence is provided.')
+                    m2 = await channel.send('If you decide to not add further evidence, confirm this with a text message (e.g. `no evidence required`).')
+                    await m2.add_reaction('⏩')
+
+                    incident.cleanup_queue.extend([m1.id, m2.id])
+                    TinyConnector.update_guild(server)
+                    return
 
 
         # delete the old questions, this helps in keeping the channel clean
@@ -836,11 +854,21 @@ class IncidentModule(commands.Cog):
         if not incident:
             return
 
+
+        if message.content and message.content == '⏩':
+            m = await message.channel.send('In order to advance the ticket, you need to *react* with ⏩ instead of sending a message')
+            await m.add_reaction('⏩')
+            incident.cleanup_queue.append(m.id)
+
+
+
         # timeout counter for closing the incident
         t = datetime.now()
         incident.last_msg = t.timestamp()
 
         TinyConnector.update_guild(server)
+
+
 
 
 
@@ -866,7 +894,7 @@ class IncidentModule(commands.Cog):
                 if channel is None:
                     # channel was deleted and incident is dangling
                     # TODO: decide later what to do
-                    return
+                    continue
 
 
                 if incident.state == State.VICTIM_STATEMENT and delta > timedelta(minutes=30):
@@ -875,7 +903,7 @@ class IncidentModule(commands.Cog):
                 elif incident.state == State.VICTIM_PROOF and delta > timedelta(minutes=30):
                     # if this fails, the state-machine will not advance
                     # this will lead to continuous pinging of the victim (by design)
-                    await self.incident_notify_offender(guild, channel.id, incident.channel_id)
+                    await self.incident_notify_offender(guild, channel.id, incident.channel_id, check_proof_exists = False)
 
                 # offender got 1 day for initial statement
                 elif incident.state == State.OFFENDER_STATEMENT and delta > timedelta(days=1):
@@ -890,8 +918,6 @@ class IncidentModule(commands.Cog):
                     await self.incident_steward_sumup(guild, channel.id, incident.channel_id)
                     await self.incident_steward_end_statement(guild, channel.id, incident.channel_id)
 
-
-                # currently state 4->6, as state 5 does not need user interaction
 
                 # the incident is auto-closed after 1 further day
                 elif incident.state == State.DISCUSSION_PHASE and delta > timedelta(days=1):
@@ -943,7 +969,7 @@ class IncidentModule(commands.Cog):
                 await self.incident_victim_proof(guild, channel.id, incident.channel_id)
 
             elif incident.state == State.VICTIM_PROOF and payload.member.id == incident.victim.u_id:
-                await self.incident_notify_offender(guild, channel.id, incident.channel_id)
+                await self.incident_notify_offender(guild, channel.id, incident.channel_id, check_proof_exists = True)
 
             elif incident.state == State.OFFENDER_STATEMENT and payload.member.id == incident.offender.u_id:
                 await self.incident_offender_proof(guild, channel.id, incident.channel_id)
