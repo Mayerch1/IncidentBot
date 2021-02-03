@@ -181,6 +181,9 @@ class IncidentModule(commands.Cog):
         incident.state = State.CLOSED_PHASE
         incident.locked_time = datetime.now().timestamp()
 
+        # the incident channel is the command channel
+        await cmd.channel.edit(name= '❌ ' + cmd.channel.name[1:])
+
 
         TinyConnector.update_guild(server)
 
@@ -375,7 +378,7 @@ class IncidentModule(commands.Cog):
         server = TinyConnector.get_guild(cmd.guild.id)
 
         # create channel and ask user for more input
-        ch_name = 'Incident Ticket - {:d}'.format(server.incident_cnt + 1)
+        ch_name = '🅰 Incident Ticket - {:d}'.format(server.incident_cnt + 1)
 
         section = self.client.get_channel(server.incident_section_id)
         steward_role = cmd.guild.get_role(server.stewards_id)
@@ -567,6 +570,8 @@ class IncidentModule(commands.Cog):
 
         TinyConnector.update_guild(server)
 
+        await channel.edit(name='🅾 ' + channel.name[1:])
+
 
 
 
@@ -642,6 +647,8 @@ class IncidentModule(commands.Cog):
 
         incident.cleanup_queue.extend([q1.id, msg.id])
         TinyConnector.update_guild(server)
+
+        await channel.edit(name = '🛂 ' + channel.name[1:])
 
 
 
@@ -725,6 +732,9 @@ class IncidentModule(commands.Cog):
         await channel.set_permissions(offender, read_messages=True, send_messages=True, read_message_history=True)
 
 
+        await channel.edit(name = '✅ ' + channel.name[1:])
+
+
 
     async def incident_modify_outcome(self, guild, channel_id, incident_id, editing_steward):
 
@@ -802,6 +812,7 @@ class IncidentModule(commands.Cog):
 
 
         await channel.send('The ticket is closed, please do not interact with this channel anymore.')
+        await channel.edit(name= '🔒 ' + channel.name[1:])
 
 
 
@@ -911,7 +922,7 @@ class IncidentModule(commands.Cog):
                     await self.incident_notify_offender(guild, channel.id, incident.channel_id, check_proof_exists = False)
 
                 # offender got 1 day for initial statement
-                elif incident.state == State.OFFENDER_STATEMENT and delta > timedelta(days=1):
+                elif incident.state == State.OFFENDER_STATEMENT and delta > timedelta(days=2):
                     await self.incident_offender_proof(guild, channel.id, incident.channel_id)
 
                 # further 2 hours for upload of proof
@@ -919,7 +930,7 @@ class IncidentModule(commands.Cog):
                     await self.incident_notify_stewards(guild, channel.id, incident.channel_id)
 
                 # the stewards got 2 days of reaction
-                elif incident.state == State.STEWARD_STATEMENT and delta > timedelta(days=4):
+                elif incident.state == State.STEWARD_STATEMENT and delta > timedelta(days=5):
                     await self.incident_steward_sumup(guild, channel.id, incident.channel_id)
                     await self.incident_steward_end_statement(guild, channel.id, incident.channel_id)
 
