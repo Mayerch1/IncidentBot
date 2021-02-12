@@ -1,5 +1,6 @@
 import os
 import re
+import io
 
 from datetime import datetime, timedelta
 
@@ -15,6 +16,7 @@ from util.verboseErrors import VerboseErrors
 from util.interaction import ack_message, guess_target_section, guess_target_text, get_client_response, get_client_reaction, wait_confirm_deny
 
 from util.displayEmbeds import incident_embed
+from util.htm_gen import gen_html_report
 
 
 class IncidentModule(commands.Cog):
@@ -799,6 +801,7 @@ class IncidentModule(commands.Cog):
         incident.state = State.CLOSED_PHASE
         incident.locked_time = datetime.now().timestamp()
 
+
         TinyConnector.update_guild(server)
 
 
@@ -811,8 +814,17 @@ class IncidentModule(commands.Cog):
             await statement_ch.send(embed = incident_embed(incident, channel.name, incident.race_name))
 
 
+
         await channel.send('The ticket is closed, please do not interact with this channel anymore.')
         await channel.edit(name= '🔒 ' + channel.name[1:])
+
+
+        # post the report summary in the incident channel, until the design is improved
+        html_str = await gen_html_report(channel, incident.victim.u_id, incident.offender.u_id, server.stewards_id, self.client.user.id)
+
+        if html_str:
+            f_p = io.StringIO(html_str)
+            await channel.send('You can download the log of this ticket', file=discord.File(fp=f_p, filename=channel.name[2:] + '.html'))
 
 
 
@@ -908,7 +920,8 @@ class IncidentModule(commands.Cog):
 
 
                 if channel is None:
-                    # channel was deleted and incident is dangling
+                    # don't immediately delete incident if channel is not existing
+                    # discord gateway could be down instead
                     # TODO: decide later what to do
                     continue
 
@@ -921,7 +934,7 @@ class IncidentModule(commands.Cog):
                     # this will lead to continuous pinging of the victim (by design)
                     await self.incident_notify_offender(guild, channel.id, incident.channel_id, check_proof_exists = False)
 
-                # offender got 1 day for initial statement
+                # offender got 2 day for initial statement
                 elif incident.state == State.OFFENDER_STATEMENT and delta > timedelta(days=2):
                     await self.incident_offender_proof(guild, channel.id, incident.channel_id)
 
@@ -936,7 +949,7 @@ class IncidentModule(commands.Cog):
 
 
                 # the incident is auto-closed after 1 further day
-                elif incident.state == State.DISCUSSION_PHASE and delta > timedelta(days=1):
+                elif incident.state == State.DISCUSSION_PHASE and delta > timedelta(days=2):
                     await self.incident_close_incident(guild, channel.id, incident.channel_id)
 
 
