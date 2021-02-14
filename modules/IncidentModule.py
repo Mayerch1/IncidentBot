@@ -801,7 +801,6 @@ class IncidentModule(commands.Cog):
         incident.state = State.CLOSED_PHASE
         incident.locked_time = datetime.now().timestamp()
 
-
         TinyConnector.update_guild(server)
 
 
@@ -822,9 +821,15 @@ class IncidentModule(commands.Cog):
         # post the report summary in the incident channel, until the design is improved
         html_str = await gen_html_report(channel, incident.victim.u_id, incident.offender.u_id, server.stewards_id, self.client.user.id)
 
+        # import codecs
+
         if html_str:
             f_p = io.StringIO(html_str)
             await channel.send('You can download the log of this ticket', file=discord.File(fp=f_p, filename=channel.name[2:] + '.html'))
+
+            # with codecs.open('test_output.html', 'w', encoding="utf-8") as f_dbg:
+            #     f_dbg.write(html_str)
+
 
 
 

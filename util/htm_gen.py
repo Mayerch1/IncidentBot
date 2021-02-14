@@ -37,30 +37,48 @@ async def gen_html_report(channel, victim_id, offender_id, steward_id, bot_id):
 
 
         nickname = msg.author.display_name
-        time_str = msg.created_at.strftime('%H:%M %d.%m.%y')
+        time_hour_str = msg.created_at.strftime('%H:%M')
+        time_day_str = msg.created_at.strftime('%d.%m.%y')
 
 
         if msg.embeds:
             embed_placeholder = '[{:d} embed(s) not displayed]'.format(len(msg.embeds))
         else:
-            embed_placeholder = ' '
+            embed_placeholder = None
 
         if msg.attachments:
             attach_placeholder = '[{:d} attachment(s) not displayed]'.format(len(msg.attachments))
         else:
-            attach_placeholder = ' '
+            attach_placeholder = None
+
+        # replace line breakes with separate <p> tags in html
+        msg_text = msg.clean_content.replace('\n', "</br>\n           ")
+        #msg_text = msg_text.replace('\n', '</p>\n           <p>')
 
 
+        template += '   <div class="container {:s}">\n'\
+                    '       <div class="avatar mr-25">\n'\
+                    '           <img class="row" src="{:s}" alt="Avatar">\n'\
+                    '           <span class="row name">{:s}</span>\n'\
+                    '       </div>\n'\
+                    '\n'\
+                    '       <div class="comments mr-25">\n'\
+                    '           <p>{:s}</p>\n'.format(h_type, avatar_url, nickname, msg_text)
+
+        if embed_placeholder:
+            template += '           <p>{:s}</p>\n'.format(embed_placeholder)
+
+        if attach_placeholder:
+            template += '           <p>{:s}</p>\n'.format(attach_placeholder)
 
 
-        template += '     <div class="container {:s}">\n'\
-                    '        <img src="{:s}" alt="Avatar" class="{:s}">\n'\
-                    '        <p class="name">{:s}</p>\n'\
-                    '        <p>{:s}</p>\n'\
-                    '        <p>{:s}</p>\n'\
-                    '        <p>{:s}</p>\n'\
-                    '        <span class="time-right">{:s}</span>\n'\
-                    '     </div>\n\n'.format(h_type, avatar_url, h_class, nickname, msg.clean_content, embed_placeholder, attach_placeholder, time_str)
+        template += '       </div>'\
+                    '\n'\
+                    '       <div class="time row">\n'\
+                    '           <p>{:s}</br>\n'\
+                    '           {:s}</p>\n'\
+                    '       </div>\n'\
+                    '   </div>\n\n'.format(time_hour_str, time_day_str)
 
 
 

@@ -1,69 +1,80 @@
 <html>
 <head>
     <style type="text/css">
-     /* Chat containers */
-    .container {
-        border: 2px solid #dedede;
-        background-color: #f1f1f1;
-        border-radius: 5px;
-        padding: 10px;
-        margin: 10px 0;
-    }
+        /* Chat containers */
+       .container {
+           border: 2px solid #dedede;
+           background-color: #f1f1f1;
+           border-radius: 5px;
+           padding: 10px;
+           margin: 10px 0;
+           font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+           display: flex;
+           flex-wrap: nowrap;
+       }
 
-    /* Darker chat container */
-    .offender {
-        border-color: #ccc;
-        background-color: #ddd;
-    }
+       /* Darker chat container */
+       .offender {
+           border-color: #bbb;
+           background-color: #ccc;
+       }
 
-    .steward {
-        border-color: rgb(255, 160, 160);
-        background-color: #ddd;
-    }
+       .steward {
+           border-color: rgb(255, 160, 160);
+           background-color: #ddd;
+       }
 
-    .bot {
-        border-color: rgb(155, 195, 255);
-        background-color: #ddd;
-    }
+       .bot {
+           border-color: rgb(155, 195, 255);
+           background-color: #ddd;
+       }
 
-    /* Clear floats */
-    .container::after {
-        content: "";
-        clear: both;
-        display: table;
-    }
+       /* Style images */
+       .container img {
+          max-width: 60px;
+          width: 100%;
+          border-radius: 50%;
+       }
 
-    /* Style images */
-    .container img {
-        float: left;
-        max-width: 60px;
-        width: 100%;
-        margin-right: 20px;
-        border-radius: 50%;
-    }
+       /* Style time text */
+       .time {
+           color: #aaa;
+           font-size: small;
+           font-weight: lighter;
+          align-self: flex-end;
+       }
 
-    /* Style the right image */
-    .container img.right {
-        float: right;
-        margin-left: 20px;
-        margin-right:0;
-    }
+       .name {
+          color: rgb(114, 114, 114);
+           font-size: large;
+          font-weight: bolder;
+          margin-top: 5px;
+       }
+       .row {
+          display: flex;
+          flex-direction: row;
+          flex-wrap: wrap;
+      }
 
-    /* Style time text */
-    .time-right {
-        float: right;
-        color: #aaa;
-    }
+      .column {
+          display: flex;
+          flex-direction: column;
+          flex-basis: 100%;
+          flex: 1;
+      }
 
-    /* Style time text */
-    .time-left {
-        float: left;
-        color: #999;
-    }
+       .comments {
+          flex: 3 3 auto;
+          margin-left: 25px;
+       }
 
-    .name {
-        color: rgb(114, 114, 114)
-    }
+       p {
+          margin: 6px;
+       }
+
+      .mr-25 {
+          margin-right: 25px;
+      }
     </style>
 </head>
 <body>
