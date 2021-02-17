@@ -1,12 +1,14 @@
 from decimal import *
 from datetime import datetime, timedelta
 import json
+from threading import Lock
 
 import copy
 
 
-from tinydb import TinyDB, Query
+from tinydb import TinyDB, Query, where
 from tinydb.operations import delete
+
 
 import lib.data
 
@@ -24,14 +26,14 @@ class Server:
     active_incidents = {}
 
 
-
-
 class TinyConnector:
     _current_file = 'servers.json'
     db = TinyDB(_current_file)
     q = Query()
 
     cache = {}
+
+    db_lock = Lock()
 
     @staticmethod
     def _set_database(file_path: str):
@@ -118,9 +120,6 @@ class TinyConnector:
         return server
 
 
-
-
-
     # only return the guild prefix
     # if guild is cached use this cache (equal performance to get_guild)
     # if NOT cached, do not convert str->Decimal (faster than copmlete conversion, but cache will not be updated)
@@ -147,6 +146,7 @@ class TinyConnector:
             # this allows easy abort of functions on error, w/o corrupted datasets
             return copy.deepcopy(TinyConnector.cache[guild_id])
 
+
         TinyConnector._init_guild(guild_id)  # does nothing if guild exists in db
         db_json = TinyConnector.db.get(TinyConnector.q.g_id == guild_id)  # must return valid entry
 
@@ -161,11 +161,91 @@ class TinyConnector:
     # never use self-contsructed Server objects
     @staticmethod
     def update_guild(guild: Server):
+        """update the entire guild object in the db
+           might cause data loss, if multiple guild objects are accessed async
+
+        """
+
+        TinyConnector.db_lock.acquire()
+
         # update cache
         # but always update db aswell in case of program crash
-        TinyConnector.cache[guild.g_id] = guild
+        TinyConnector.cache[guild.g_id] = copy.deepcopy(guild)
 
         # user should only supply a Server object which he retrieved from get_guild
         guild_json = TinyConnector._obj_to_json(guild)
         guild_json.pop('g_id') # get the obj->json but remove the key of the server_id as this is the primary (sort of)
-        TinyConnector.db.update(guild_json, TinyConnector.q.g_id == guild.g_id)
+
+        try:
+            TinyConnector.db.update(guild_json, TinyConnector.q.g_id == guild.g_id)
+        finally:
+            TinyConnector.db_lock.release()
+
+
+
+    @staticmethod
+    def update_incident(guild_id: int, incident: lib.data.Incident):
+        """update only the passed incident in the db
+           all other modifications to the guild obj are lost
+           prevents data loss, as long as each incident is only accessed at a time
+           (but multiple guild objects at a time)
+
+           get_guild MUST be called before
+
+        """
+
+        TinyConnector.db_lock.acquire()
+
+        # update cache, guild is guaranteed to exist in cache?
+        # but always update db aswell in case of program crash
+        TinyConnector.cache[guild_id].active_incidents[incident.channel_id] = copy.deepcopy(incident)
+
+        # work with the cached db, this already includes the updated incident now
+        a_inc_json = lib.data.incidents_to_json(TinyConnector.cache[guild_id].active_incidents)
+
+
+        try:
+            TinyConnector.db.update({'active_incidents': a_inc_json}, TinyConnector.q.g_id == guild_id)
+        finally:
+            TinyConnector.db_lock.release()
+
+
+    @staticmethod
+    def delete_incident(guild_id: int, incident_id: int):
+        """deletes given incident out of db
+           get_guild MUST be called before
+
+        """
+
+        TinyConnector.db_lock.acquire()
+
+        del TinyConnector.cache[guild_id].active_incidents[incident_id]
+
+        # work with the cached db, this already includes the updated incident now
+        a_inc_json = lib.data.incidents_to_json(TinyConnector.cache[guild_id].active_incidents)
+
+
+        try:
+            TinyConnector.db.update({'active_incidents': a_inc_json}, TinyConnector.q.g_id == guild_id)
+        finally:
+            TinyConnector.db_lock.release()
+
+
+    @staticmethod
+    def incr_inc_cnt(guild: Server):
+
+        TinyConnector.db_lock.acquire()
+
+        TinyConnector.cache[guild.g_id].incident_cnt += 1
+
+        # work with the cached db, this already includes the updated incident now
+        inc_cnt = TinyConnector.cache[guild.g_id].incident_cnt
+
+
+        try:
+            TinyConnector.db.update({'incident_cnt': inc_cnt}, TinyConnector.q.g_id == guild.g_id)
+        finally:
+            TinyConnector.db_lock.release()
+
+
+

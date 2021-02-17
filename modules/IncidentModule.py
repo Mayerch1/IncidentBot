@@ -187,7 +187,7 @@ class IncidentModule(commands.Cog):
         await cmd.channel.edit(name= '❌ ' + cmd.channel.name[1:])
 
 
-        TinyConnector.update_guild(server)
+        TinyConnector.update_incident(incident)
 
 
 
@@ -247,11 +247,9 @@ class IncidentModule(commands.Cog):
         incident = await self.incident_setup_channel(cmd, incident)
 
 
-        # re-fetch guild, as it could have changed
-        server = TinyConnector.get_guild(cmd.guild.id)
-        server.active_incidents[incident.channel_id] = incident
-        server.incident_cnt += 1
-        TinyConnector.update_guild(server)
+        # re-fetch not required, as incident object is newly created
+        TinyConnector.incr_inc_cnt(server)
+        TinyConnector.update_incident(server.g_id, incident)
 
 
 
@@ -496,7 +494,7 @@ class IncidentModule(commands.Cog):
 
         incident.cleanup_queue.extend([m1.id, m2.id, m3.id, m4.id, msg.id])
 
-        TinyConnector.update_guild(server)
+        TinyConnector.update_incident(server.g_id, incident)
 
 
 
@@ -524,7 +522,7 @@ class IncidentModule(commands.Cog):
                     await m2.add_reaction('⏩')
 
                     incident.cleanup_queue.extend([m1.id, m2.id])
-                    TinyConnector.update_guild(server)
+                    TinyConnector.update_incident(server.g_id, incident)
                     return
 
 
@@ -540,7 +538,7 @@ class IncidentModule(commands.Cog):
 
 
         # save is required here, as next steps will require delay
-        TinyConnector.update_guild(server)
+        TinyConnector.update_incident(server.g_id, incident)
 
 
         # # re-fetch the server-object, as it could have changed
@@ -570,7 +568,7 @@ class IncidentModule(commands.Cog):
             incident.cleanup_queue.extend([msg.id, q2.id])
 
 
-        TinyConnector.update_guild(server)
+        TinyConnector.update_incident(server.g_id, incident)
 
         await channel.edit(name='🅾 ' + channel.name[1:])
 
@@ -607,7 +605,7 @@ class IncidentModule(commands.Cog):
 
 
         incident.cleanup_queue.extend([q1.id, q2.id, msg.id])
-        TinyConnector.update_guild(server)
+        TinyConnector.update_incident(server.g_id, incident)
 
 
 
@@ -648,7 +646,7 @@ class IncidentModule(commands.Cog):
 
 
         incident.cleanup_queue.extend([q1.id, msg.id])
-        TinyConnector.update_guild(server)
+        TinyConnector.update_incident(server.g_id, incident)
 
         await channel.edit(name = '🛂 ' + channel.name[1:])
 
@@ -671,7 +669,7 @@ class IncidentModule(commands.Cog):
         incident.cleanup_queue = []
 
 
-        TinyConnector.update_guild(server)
+        TinyConnector.update_incident(server.g_id, incident)
 
 
         q1 = await channel.send('<@&{:d}> please state the category of infringement which was judged in 1 short sentence (e.g. \'causing a collision\', \'abuse of track limits\', ...)'.format(server.stewards_id))
@@ -691,7 +689,7 @@ class IncidentModule(commands.Cog):
 
         incident.cleanup_queue.extend([q1.id, q2.id])
 
-        TinyConnector.update_guild(server)
+        TinyConnector.update_incident(server.g_id, incident)
 
 
 
@@ -715,7 +713,7 @@ class IncidentModule(commands.Cog):
         incident.cleanup_queue = []
 
 
-        TinyConnector.update_guild(server)
+        TinyConnector.update_incident(server.g_id, incident)
 
 
         msg = await channel.send('<@&{:d}> you can close (🔒)  the incident at any point or modify the outcome (🔧) by reacting to it.'.format(server.stewards_id))
@@ -781,7 +779,7 @@ class IncidentModule(commands.Cog):
 
 
         if is_modified:
-            TinyConnector.update_guild(server)
+            TinyConnector.update_incident(server.g_id, incident)
 
             await dm.send('Done')
             eb = await channel.send(embed=incident_embed(incident, channel.name, incident.race_name))
@@ -801,7 +799,7 @@ class IncidentModule(commands.Cog):
         incident.state = State.CLOSED_PHASE
         incident.locked_time = datetime.now().timestamp()
 
-        TinyConnector.update_guild(server)
+        TinyConnector.update_incident(guild.id, incident)
 
 
         # incident id is channel id
@@ -850,9 +848,8 @@ class IncidentModule(commands.Cog):
         # incident id is channel id
         channel = guild.get_channel(incident.channel_id)
 
-        del server.active_incidents[incident_id]
-        TinyConnector.update_guild(server)
 
+        TinyConnector.delete_incident(server.g_id, incident_id)
         # silent fail?
         await channel.delete()
 
@@ -899,7 +896,7 @@ class IncidentModule(commands.Cog):
         t = datetime.now()
         incident.last_msg = t.timestamp()
 
-        TinyConnector.update_guild(server)
+        TinyConnector.update_incident(server.g_id, incident)
 
 
 
