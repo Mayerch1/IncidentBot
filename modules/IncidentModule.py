@@ -226,8 +226,28 @@ class IncidentModule(commands.Cog):
             return
 
 
-
         dm = await cmd.author.create_dm()
+
+
+        # send the disclaimer at this position
+        # this is used to probe for DM permission
+        if os.path.exists('modules/disclaimer.txt'):
+            with open('modules/disclaimer.txt', 'r') as f:
+                disclaimer_str = ' '.join(f.readlines())
+
+        try:
+            await dm.send(disclaimer_str)
+        except discord.errors.Forbidden as e:
+            embed = discord.Embed(title='Missing DM Permission',
+                                    description='Please [change your preferences]({:s}) and invoke this '\
+                                                'command again.\n You can revert the changes after the ticket is setup.'
+                                                .format(r'https://support.discord.com/hc/en-us/articles/217916488-Blocking-Privacy-Settings-'),
+                                    color=0xff0000)
+            await cmd.send(embed = embed)
+            return
+
+
+
         await cmd.send('I have sent you a DM to continue the ticket process.')
         await cmd.send('This incident is now looked at by the stewards. There\'s no need for further discussions in this channel.')
 
@@ -315,10 +335,6 @@ class IncidentModule(commands.Cog):
 
 
     async def incident_setup_dm(self, cmd, dm):
-
-        if os.path.exists('modules/disclaimer.txt'):
-            with open('modules/disclaimer.txt', 'r') as f:
-                await dm.send(' '.join(f.readlines()))
 
 
         embed = discord.Embed(title='New Incident Ticket',
