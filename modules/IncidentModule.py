@@ -829,7 +829,7 @@ class IncidentModule(commands.Cog):
 
 
         await channel.send('The ticket is closed, please do not interact with this channel anymore.')
-        await channel.edit(name= '🔒 ' + channel.name[1:])
+
 
 
         # post the report summary in the incident channel, until the design is improved
@@ -843,6 +843,10 @@ class IncidentModule(commands.Cog):
 
             # with codecs.open('test_output.html', 'w', encoding="utf-8") as f_dbg:
             #     f_dbg.write(html_str)
+
+
+        await channel.edit(name= '🔒 ' + channel.name[1:])
+        print('renamed channel to locked state')
 
 
 

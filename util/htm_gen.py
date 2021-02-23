@@ -3,7 +3,11 @@ import codecs
 
 
 def _is_member_steward(member, steward_id):
-            return any(r.id == steward_id for r in member.roles)
+    # cannot determin roles, if the user isn't a member
+    if isinstance(member, discord.Member):
+        return any(r.id == steward_id for r in member.roles)
+    else:
+        return False
 
 
 async def gen_html_report(channel, victim_id, offender_id, steward_id, bot_id):
