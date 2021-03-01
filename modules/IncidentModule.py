@@ -394,7 +394,7 @@ class IncidentModule(commands.Cog):
         server = TinyConnector.get_guild(cmd.guild.id)
 
         # create channel and ask user for more input
-        ch_name = '🇻 Incident Ticket - {:d}'.format(server.incident_cnt + 1)
+        ch_name = '🅰 Incident Ticket - {:d}'.format(server.incident_cnt + 1)
 
         section = self.client.get_channel(server.incident_section_id)
         steward_role = cmd.guild.get_role(server.stewards_id)
@@ -586,7 +586,7 @@ class IncidentModule(commands.Cog):
 
         TinyConnector.update_incident(server.g_id, incident)
 
-        await channel.edit(name='🇴 ' + channel.name[1:])
+        await channel.edit(name='🅾 ' + channel.name[1:])
 
 
 
