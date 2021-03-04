@@ -647,12 +647,14 @@ class IncidentModule(commands.Cog):
         await channel.set_permissions(offender, read_messages=True, send_messages=False, read_message_history=True)
 
 
-
+        # the poll turns out to be useless, if the incident channels are private
+        """
         embed = discord.Embed(title='Poll', description='Vote if you think this incident should be punished or not')
         embed.set_footer(text='This is only to get a general mood of the stewards. The decision is in no way bound by this poll')
         embed_msg = await channel.send(embed=embed)
         await embed_msg.add_reaction('✅')
         await embed_msg.add_reaction('❌')
+        """
 
 
         q1 = await channel.send('<@&{:d}> please have a look at this incident and state your judgement.'.format(server.stewards_id))

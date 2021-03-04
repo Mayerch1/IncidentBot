@@ -1,6 +1,9 @@
 import discord
 import codecs
 
+import base64
+import requests
+
 
 def _is_member_steward(member, steward_id):
     # cannot determin roles, if the user isn't a member
@@ -44,16 +47,32 @@ async def gen_html_report(channel, victim_id, offender_id, steward_id, bot_id):
         time_hour_str = msg.created_at.strftime('%H:%M')
         time_day_str = msg.created_at.strftime('%d.%m.%y')
 
+        img_content = None
+
 
         if msg.embeds:
             embed_placeholder = '[{:d} embed(s) not displayed]'.format(len(msg.embeds))
         else:
             embed_placeholder = None
 
-        if msg.attachments:
-            attach_placeholder = '[{:d} attachment(s) not displayed]'.format(len(msg.attachments))
-        else:
-            attach_placeholder = None
+        img_content = ''
+        attach_placeholder = None
+        missed_attachments = 0
+
+        for img in msg.attachments:
+
+
+            if img.filename.endswith('jpg') or img.filename.endswith('png'):
+
+                img_base64 = base64.b64encode(requests.get(img.proxy_url).content)
+                img_content += '           <img alt="" src="data:image/png;base64,{:s}" />\n'.format(img_base64.decode('utf-8'))
+            else:
+                missed_attachments += 1
+
+
+        if missed_attachments > 0:
+            attach_placeholder = '[{:d} attachment(s) not displayed]'.format(missed_attachments)
+
 
         # replace line breakes with separate <p> tags in html
         msg_text = msg.clean_content.replace('\n', "</br>\n           ")
@@ -62,7 +81,7 @@ async def gen_html_report(channel, victim_id, offender_id, steward_id, bot_id):
 
         template += '   <div class="container {:s}">\n'\
                     '       <div class="avatar mr-25">\n'\
-                    '           <img class="row" src="{:s}" alt="Avatar">\n'\
+                    '           <img class="row imgProfile" src="{:s}" alt="Avatar">\n'\
                     '           <span class="row name">{:s}</span>\n'\
                     '       </div>\n'\
                     '\n'\
@@ -74,6 +93,9 @@ async def gen_html_report(channel, victim_id, offender_id, steward_id, bot_id):
 
         if attach_placeholder:
             template += '           <p>{:s}</p>\n'.format(attach_placeholder)
+
+        if img_content != '':
+            template += img_content
 
 
         template += '       </div>'\
