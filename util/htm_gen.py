@@ -13,6 +13,27 @@ def _is_member_steward(member, steward_id):
         return False
 
 
+def _gen_embed_column(field_list: []):
+
+    html = '                     <div>\n'\
+           '                       <ul class="ulEmbed">\n'\
+
+    for field in field_list:
+        html += '                         <li>\n'\
+                '                           <h4>{:s}</h4>\n'\
+                '                           <p>{:s}</p>\n'\
+                '                         </li>\n'\
+                '                         <li><br></li>'.format(field.name, field.value)
+
+    html += '                       </ul>\n'\
+            '                     </div>\n'
+
+    return html
+
+
+
+
+
 async def gen_html_report(channel, victim_id, offender_id, steward_id, bot_id):
 
     messages = await channel.history(limit=200).flatten()
@@ -50,20 +71,59 @@ async def gen_html_report(channel, victim_id, offender_id, steward_id, bot_id):
         img_content = None
 
 
-        if msg.embeds:
+        embed_content = ''
+        embed_placeholder = None
+        missed_embeds = 0
+
+        for embed in msg.embeds:
+            if embed.type == 'rich':
+                embed_content = '			<div class="embed">\n'\
+                                '  			  <div></div>\n'\
+                                '  			    <div>\n'\
+                                '    			  <h1>{:s}</h1>\n'\
+                                '                 <p>{:s}</p>\n'\
+                                '                   <div class="content">\n'.format(embed.title, embed.description)
+
+                fields_left = []
+                fields_right = []
+                toggle = True
+
+                for field in embed.fields:
+                    if toggle:
+                        fields_left.append(field)
+                        toggle = False
+                    else:
+                        fields_right.append(field)
+                        toggle = True
+
+
+                embed_content += _gen_embed_column(fields_left)
+                embed_content += _gen_embed_column(fields_right)
+
+
+                embed_content += '                   </ul>\n'\
+                                 '                 </div>\n'\
+                                 '               </div>\n'\
+                                 '             </div>'
+
+
+            else:
+                missed_embeds += 1
+
+
+        if missed_embeds != 0:
             embed_placeholder = '[{:d} embed(s) not displayed]'.format(len(msg.embeds))
-        else:
-            embed_placeholder = None
+
+
 
         img_content = ''
         attach_placeholder = None
         missed_attachments = 0
 
         for img in msg.attachments:
-
-
+            # an attachment could be any file supported by discord
+            # but base64 embed is currently only used for jpg/png
             if img.filename.endswith('jpg') or img.filename.endswith('png'):
-
                 img_base64 = base64.b64encode(requests.get(img.proxy_url).content)
                 img_content += '           <img alt="" src="data:image/png;base64,{:s}" />\n'.format(img_base64.decode('utf-8'))
             else:
@@ -88,14 +148,17 @@ async def gen_html_report(channel, victim_id, offender_id, steward_id, bot_id):
                     '       <div class="comments mr-25">\n'\
                     '           <p>{:s}</p>\n'.format(h_type, avatar_url, nickname, msg_text)
 
+        if img_content != '':
+            template += img_content
+
+        if embed_content != '':
+            template += embed_content
+
         if embed_placeholder:
             template += '           <p>{:s}</p>\n'.format(embed_placeholder)
 
         if attach_placeholder:
             template += '           <p>{:s}</p>\n'.format(attach_placeholder)
-
-        if img_content != '':
-            template += img_content
 
 
         template += '       </div>'\

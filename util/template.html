@@ -47,7 +47,7 @@
 
        .name {
           color: rgb(220, 220, 220);
-           font-size: large;
+          font-size: large;
           font-weight: bolder;
           margin-top: 5px;
        }
@@ -76,6 +76,48 @@
       .mr-25 {
           margin-right: 25px;
       }
+
+      .embed {
+        padding: 10px;
+        color: rgba(255, 255, 255, 0.876);
+        display: flex;
+        flex-direction: row;
+        padding-right: 0;
+      }
+
+      .embed > div:nth-child(1) {
+        border-top-left-radius: 8px;
+        border-bottom-left-radius: 8px;
+        background-color: rebeccapurple;
+        background-color: coral;
+        width: 8px;
+        margin: 0;
+      }
+
+      .embed > div:nth-child(2) {
+        padding: 5px 20px;
+        background-color: #333;
+        border-top: 1px solid black;
+        border-right: 1px solid black;
+        border-bottom: 1px solid black;
+        border-top-right-radius: 5px;
+        border-bottom-right-radius: 5px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .content > * {
+        float: left;
+      }
+
+      .content > :not(div) {
+       padding-top: 43px;
+      }
+
+      ul {
+       list-style: none;
+      }
+
     </style>
 </head>
 <body style="background-color:#36393e">
