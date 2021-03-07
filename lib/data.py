@@ -47,9 +47,9 @@ def _driver_to_json(d: Driver):
 def _json_to_driver(json):
     d = Driver()
 
-    d.name = json['name']
-    d.number = int(json['number'])
-    d.u_id = int(json['u_id'])
+    d.name = json.get('name', '')
+    d.number = int(json.get('number', '0'))
+    d.u_id = int(json.get('u_id', '0'))
 
     return d
 
@@ -79,18 +79,18 @@ def _incident_to_json(incident: Incident):
 def _json_to_incident(json):
     i = Incident()
 
-    i.race_name = json['race_name']
-    i.infringement = json['infringement']
-    i.outcome = json['outcome']
+    i.race_name = json.get('race_name', '')
+    i.infringement = json.get('infringement', '')
+    i.outcome = json.get('outcome', '')
     i.channel_id = int(json['channel_id'])
-    i.lap = json['lap']
+    i.lap = json.get('lap', '')
     i.state = State(int(json['state']))
     i.last_msg = float(json['last_msg'])
     i.locked_time = float(json['locked_time'])
-    i.cleanup_queue = json['cleanup_queue']
+    i.cleanup_queue = json.get('cleanup_queue', [])
 
-    i.victim = _json_to_driver(json['victim'])
-    i.offender = _json_to_driver(json['offender'])
+    i.victim = _json_to_driver(json.get('victim', {}))
+    i.offender = _json_to_driver(json.get('offender', {}))
 
     return i
 

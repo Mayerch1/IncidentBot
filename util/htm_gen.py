@@ -20,10 +20,10 @@ def _gen_embed_column(field_list: []):
 
     for field in field_list:
         html += '                         <li>\n'\
-                '                           <h4>{:s}</h4>\n'\
+                '                           <h4 class="hEmbed">{:s}</h4>\n'\
                 '                           <p>{:s}</p>\n'\
                 '                         </li>\n'\
-                '                         <li><br></li>'.format(field.name, field.value)
+                '                         <li><br></li>\n'.format(field.name, field.value)
 
     html += '                       </ul>\n'\
             '                     </div>\n'
@@ -80,7 +80,7 @@ async def gen_html_report(channel, victim_id, offender_id, steward_id, bot_id):
                 embed_content = '			<div class="embed">\n'\
                                 '  			  <div></div>\n'\
                                 '  			    <div>\n'\
-                                '    			  <h1>{:s}</h1>\n'\
+                                '                 <h3>{:s}</h3>\n'\
                                 '                 <p>{:s}</p>\n'\
                                 '                   <div class="content">\n'.format(embed.title, embed.description)
 
@@ -89,6 +89,7 @@ async def gen_html_report(channel, victim_id, offender_id, steward_id, bot_id):
                 toggle = True
 
                 for field in embed.fields:
+
                     if toggle:
                         fields_left.append(field)
                         toggle = False
@@ -97,14 +98,14 @@ async def gen_html_report(channel, victim_id, offender_id, steward_id, bot_id):
                         toggle = True
 
 
+
                 embed_content += _gen_embed_column(fields_left)
                 embed_content += _gen_embed_column(fields_right)
 
 
-                embed_content += '                   </ul>\n'\
-                                 '                 </div>\n'\
+                embed_content += '                 </div>\n'\
                                  '               </div>\n'\
-                                 '             </div>'
+                                 '           </div>\n'
 
 
             else:
