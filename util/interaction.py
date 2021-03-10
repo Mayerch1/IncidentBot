@@ -225,7 +225,6 @@ async def get_client_reaction(client, message: discord.Message, timeout, author 
         await message.add_reaction('⏲')
         return None
 
-
     for emoji in emoji_whitelist:
         if emoji != reaction[0].emoji:
             try:

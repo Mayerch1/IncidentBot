@@ -23,13 +23,14 @@ class IncidentModule(commands.Cog):
 
     INC_HELP   = '```*incident <command>\n'\
                  '\t[@mention] - open a new ticket\n'\
-                 '\tcancel     - abort an opened ticket (do not use for norma ticket closing)\n'\
+                 '\tcancel     - abort an opened ticket (do not use for normal ticket closing)\n'\
                  '\tsetup      - set some properties (use \'incident setup help\')```'
 
     SETUP_HELP = '```*incident setup <command>\n'\
                  '\tcategory - set the category where channels are created\n'\
                  '\tstewards - set the steward role\n'\
                  '\tsummary  - set the summary channel\n'\
+                 '\tlog      - set the log channel\n'\
                  '\thelp     - show this message```'
 
 
@@ -38,6 +39,8 @@ class IncidentModule(commands.Cog):
     # =====================
     def __init__(self, client):
         self.client = client
+        self.incident_timeout.start()
+
 
     def _is_member_steward(self, member, steward_id):
             return any(r.id == steward_id for r in member.roles)
@@ -99,6 +102,24 @@ class IncidentModule(commands.Cog):
         TinyConnector.update_guild(server)
 
 
+    async def setup_log_ch(self, cmd):
+
+        q = await cmd.send('Please enter the name of the log channel, used for publishing ticket logs')
+        resp = await get_client_response(self.client, q, 120, cmd.author)
+
+        channel = await guess_target_text(cmd, resp, cmd.guild.channels, cmd.channel, True)
+
+        if channel is None:
+            await cmd.send('Failed to set the log channel')
+            return
+
+        await cmd.send('The log channel will be `{:s}`'.format(channel.name))
+
+
+        server = TinyConnector.get_guild(cmd.guild.id)
+        server.log_ch_id = channel.id
+        TinyConnector.update_guild(server)
+
 
     async def setup_stewards(self, cmd):
 
@@ -138,6 +159,9 @@ class IncidentModule(commands.Cog):
             elif mode[0] == 'summary':
                 await self.setup_summary_ch(cmd)
 
+            elif mode[0] == 'log':
+                await self.setup_log_ch(cmd)
+
             else:
                 await cmd.send(IncidentModule.SETUP_HELP)
 
@@ -145,6 +169,7 @@ class IncidentModule(commands.Cog):
             await self.setup_category(cmd)
             await self.setup_stewards(cmd)
             await self.setup_summary_ch(cmd)
+            await self.setup_log_ch(cmd)
 
 
         await ack_message(cmd.message)
@@ -194,6 +219,28 @@ class IncidentModule(commands.Cog):
     #################################################
     ## Incident Creation - Initial question on victim
     #################################################
+
+
+    async def _set_offender_write(self, channel, victim, offender):
+        await channel.set_permissions(victim, read_messages=True, send_messages=False, read_message_history=True)
+        await channel.set_permissions(offender, read_messages=True, send_messages=True, read_message_history=True)
+
+
+    async def _set_victim_write(self, channel, victim, offender):
+        await channel.set_permissions(victim, read_messages=True, send_messages=True, read_message_history=True)
+        await channel.set_permissions(offender, read_messages=True, send_messages=False, read_message_history=True)
+
+    async def _set_all_write(self, channel, victim, offender):
+        await channel.set_permissions(victim, read_messages=True, send_messages=True, read_message_history=True)
+        await channel.set_permissions(offender, read_messages=True, send_messages=True, read_message_history=True)
+
+
+    async def _set_no_write(self, channel, victim, offender):
+        await channel.set_permissions(victim, read_messages=True, send_messages=False, read_message_history=True)
+        await channel.set_permissions(offender, read_messages=True, send_messages=False, read_message_history=True)
+
+
+
     async def incident(self, cmd, offender_id: int):
 
         perms = discord.Permissions()
@@ -211,8 +258,8 @@ class IncidentModule(commands.Cog):
             await cmd.send('You need to setup a section for incidents first. Please ask an admin to use `{:s}incident setup`'.format(server.prefix))
             return
 
-        if not server.incident_section_id:
-            await cmd.send('You need to setup a section for incidents first. Please ask an admin to use `{:s}incident setup`'.format(server.prefix))
+        if not server.statement_ch_id:
+            await cmd.send('You need to setup a summary channel for incidents first. Please ask an admin to use `{:s}incident setup`'.format(server.prefix))
             return
 
         if not server.stewards_id:
@@ -427,18 +474,7 @@ class IncidentModule(commands.Cog):
             print('steward permission:')
             print(e)
 
-        try:
-            await inc_channel.set_permissions(offender, read_messages=True, send_messages=False, read_message_history=True)
-        except Exception as e:
-            print('offender permissions:')
-            print(e)
-
-        try:
-            await inc_channel.set_permissions(cmd.message.author, read_messages=True, send_messages=True, read_message_history=True)
-        except Exception as e:
-            print('author permissions:')
-            print(e)
-
+        await self._set_victim_write(inc_channel, cmd.message.author, offender)
 
         try:
             await inc_channel.set_permissions(cmd.guild.default_role, read_messages=False, send_messages=False, read_message_history=False)
@@ -450,7 +486,7 @@ class IncidentModule(commands.Cog):
 
         # ask the initial question, from then on, handling is done in events
 
-        embed_msg = await inc_channel.send(embed=incident_embed(incident, ch_name, incident.race_name))
+        embed_msg = await inc_channel.send(embed=incident_embed(incident, ch_name[2:], incident.race_name))
         await embed_msg.add_reaction('⏩')  # skip forward emoji
 
 
@@ -475,6 +511,8 @@ class IncidentModule(commands.Cog):
 
 
 
+
+
     async def incident_victim_proof(self, guild, channel_id, incident_id):
 
         server = TinyConnector.get_guild(guild.id)
@@ -494,7 +532,6 @@ class IncidentModule(commands.Cog):
 
         m1 = await channel.send('<@{:d}> Please upload the proof of the incident\n'.format(incident.victim.u_id))
 
-        m2 = await channel.send('If possible you should provide the 1st person- and the chase- camera for both cars.\n')
         m3 = await channel.send('If you do not add any proof, this ticket might be closed without further notice.')
 
         embed = discord.Embed(title='Recommended Upload Solutions')
@@ -508,7 +545,7 @@ class IncidentModule(commands.Cog):
         await msg.add_reaction('⏩')
 
 
-        incident.cleanup_queue.extend([m1.id, m2.id, m3.id, m4.id, msg.id])
+        incident.cleanup_queue.extend([m1.id, m3.id, m4.id, msg.id])
 
         TinyConnector.update_incident(server.g_id, incident)
 
@@ -572,14 +609,14 @@ class IncidentModule(commands.Cog):
             q2 = await channel.send('<@{:d}> Please state your point of view and any other comments you want to add'.format(offender_id))
             # skip forwad emoji
             msg = await channel.send('React with ⏩ once you stated your points')
+            await msg.add_reaction('⏪')
             await msg.add_reaction('⏩')
 
             # incr. state-machine on successfull offender-determination
             incident.state = State.OFFENDER_STATEMENT
 
+            await self._set_offender_write(channel, victim, offender)
 
-            await channel.set_permissions(victim, read_messages=True, send_messages=False, read_message_history=True)
-            await channel.set_permissions(offender, read_messages=True, send_messages=True, read_message_history=True)
 
             incident.cleanup_queue.extend([msg.id, q2.id])
 
@@ -626,12 +663,12 @@ class IncidentModule(commands.Cog):
 
 
 
-    async def incident_notify_stewards(self, guild, channel_id, incident_id):
+    async def incident_notify_stewards(self, guild, channel_id, incident_id, check_proof_exists):
 
         server = TinyConnector.get_guild(guild.id)
         incident = server.active_incidents[incident_id]
 
-        incident.state = State.STEWARD_STATEMENT
+
 
         victim = await guild.fetch_member(incident.victim.u_id)
         offender = await guild.fetch_member(incident.offender.u_id)
@@ -639,12 +676,28 @@ class IncidentModule(commands.Cog):
         # incident id is channel id
         channel = guild.get_channel(incident.channel_id)
 
+
+
+        if check_proof_exists:
+            async for message in channel.history(limit=1):
+                if not message.author.id == incident.offender.u_id:
+                    m1 = await channel.send('Are you sure you don\'t want to add any proof?')
+                    m2 = await channel.send('If all important footage is already posted, confirm this with a text message (e.g. `no further evidence`).')
+                    await m2.add_reaction('⏩')
+
+                    incident.cleanup_queue.extend([m1.id, m2.id])
+                    TinyConnector.update_incident(server.g_id, incident)
+                    return
+
+        # only advance if proof check passes
+        incident.state = State.STEWARD_STATEMENT
+
+
         await self._del_msg_list(channel, incident.cleanup_queue)
         incident.cleanup_queue = []
 
 
-        await channel.set_permissions(victim, read_messages=True, send_messages=False, read_message_history=True)
-        await channel.set_permissions(offender, read_messages=True, send_messages=False, read_message_history=True)
+        await self._set_no_write(channel, victim, offender)
 
 
         # the poll turns out to be useless, if the incident channels are private
@@ -660,6 +713,7 @@ class IncidentModule(commands.Cog):
         q1 = await channel.send('<@&{:d}> please have a look at this incident and state your judgement.'.format(server.stewards_id))
         msg = await channel.send('React with ⏩ once the final steward statement is issued. You can allow both parties to respond to your statement')
 
+        await msg.add_reaction('⏪')
         await msg.add_reaction('⏩')
 
 
@@ -737,7 +791,7 @@ class IncidentModule(commands.Cog):
         msg = await channel.send('<@&{:d}> you can close (🔒)  the incident at any point or modify the outcome (🔧) by reacting to it.'.format(server.stewards_id))
 
 
-        eb = await channel.send(embed=incident_embed(incident, channel.name, incident.race_name))
+        eb = await channel.send(embed=incident_embed(incident, channel.name[2:], incident.race_name))
         await eb.add_reaction('🔒')
         await eb.add_reaction('🔧')
 
@@ -746,8 +800,7 @@ class IncidentModule(commands.Cog):
                             .format(incident.victim.u_id, incident.offender.u_id))
 
 
-        await channel.set_permissions(victim, read_messages=True, send_messages=True, read_message_history=True)
-        await channel.set_permissions(offender, read_messages=True, send_messages=True, read_message_history=True)
+        await self._set_all_write(channel, victim, offender)
 
 
         await channel.edit(name = '✅ ' + channel.name[1:])
@@ -767,7 +820,7 @@ class IncidentModule(commands.Cog):
         await channel.send('{:s} please watch your DMs to modify this ticket'.format(editing_steward.mention))
 
         dm = await editing_steward.create_dm()
-        await dm.send(embed=incident_embed(incident, channel.name, incident.race_name))
+        await dm.send(embed=incident_embed(incident, channel.name[2:], incident.race_name))
 
 
         await dm.send('Here you can correct the infringement and outcome of the ticket. Ignore this messages if you reacted by accident.\n')
@@ -800,7 +853,7 @@ class IncidentModule(commands.Cog):
             TinyConnector.update_incident(server.g_id, incident)
 
             await dm.send('Done')
-            eb = await channel.send(embed=incident_embed(incident, channel.name, incident.race_name))
+            eb = await channel.send(embed=incident_embed(incident, channel.name[2:], incident.race_name))
             await eb.add_reaction('🔒')
             await eb.add_reaction('🔧')
         else:
@@ -826,31 +879,25 @@ class IncidentModule(commands.Cog):
 
         if server.statement_ch_id:
             statement_ch = guild.get_channel(server.statement_ch_id)
-            await statement_ch.send(embed = incident_embed(incident, channel.name, incident.race_name))
-
+            await statement_ch.send(embed = incident_embed(incident, channel.name[2:], incident.race_name))
 
 
         await channel.send('The ticket is closed, please do not interact with this channel anymore.')
 
 
+        if server.log_ch_id:
+            log_ch = guild.get_channel(server.log_ch_id)
 
-        # post the report summary in the incident channel, until the design is improved
-        html_str = await gen_html_report(channel, incident.victim.u_id, incident.offender.u_id, server.stewards_id, self.client.user.id)
+            # post the report summary in the incident channel, until the design is improved
+            html_str = await gen_html_report(channel, incident.victim.u_id, incident.offender.u_id, server.stewards_id, self.client.user.id)
 
-        # import codecs
-
-        if html_str:
-            f_p = io.StringIO(html_str)
-            await channel.send('You can download the log of this ticket', file=discord.File(fp=f_p, filename=channel.name[2:] + '.html'))
-
-            # with codecs.open('test_output.html', 'w', encoding="utf-8") as f_dbg:
-            #     f_dbg.write(html_str)
+            if html_str:
+                f_p = io.StringIO(html_str)
+                await log_ch.send(file=discord.File(fp=f_p, filename=channel.name[2:] + '.html'))
 
 
         await channel.edit(name= '🔒 ' + channel.name[1:])
         print('renamed channel to locked state')
-
-
 
 
 
@@ -878,6 +925,59 @@ class IncidentModule(commands.Cog):
 
 
 
+    async def revert_incident_state(self, guild, channel_id, incident_id):
+
+        server = TinyConnector.get_guild(guild.id)
+        incident = server.active_incidents[incident_id]
+
+        # incident id is channel id
+        channel = guild.get_channel(incident.channel_id)
+        victim = await guild.fetch_member(incident.victim.u_id)
+        offender = await guild.fetch_member(incident.offender.u_id)
+
+        if incident.state == State.VICTIM_STATEMENT:
+            await channel.send('You cannot revert this ticket any further.'\
+                               ' Try cancelling the ticket (`incident cancel`).')
+            return
+
+
+        if incident.state == State.VICTIM_PROOF:
+            # there's no fixed method for this question
+            # permissions do not change between states V_PROOF and V_STATEMENT
+
+            req1 = await channel.send('Please take 1 or 2 paragraphs to state what happened, what effect it had on your race and '\
+                                'why you think its a punishable behaviour (do not post links to footage yet)')
+
+
+            req2 = await channel.send('React with ⏩ once you stated all points') # skip forwad emoji
+
+            incident.cleanup_queue.append(req1.id)
+            incident.cleanup_queue.append(req2.id)
+            incident.state = State.VICTIM_STATEMENT
+            TinyConnector.update_incident(guild.id, incident)
+
+            await self._set_victim_write(channel, victim, offender)
+
+        elif incident.state == State.OFFENDER_STATEMENT:
+            await self.incident_victim_proof(guild, channel.id, incident.channel_id)
+            await self._set_victim_write(channel, victim, offender)
+
+        elif incident.state == State.OFFENDER_PROOF:
+            await self.incident_notify_offender(guild, channel.id, incident.channel_id, check_proof_exists=False)
+            await self._set_offender_write(channel, victim, offender)
+
+        elif incident.state == State.STEWARD_STATEMENT:
+            await self.incident_offender_proof(guild, channel.id, incident.channel_id)
+            await self._set_offender_write(channel, victim, offender)
+
+        elif incident.state == State.DISCUSSION_PHASE:
+            await self.incident_notify_stewards(guild, channel.id, incident.channel_id, check_proof_exists=False)
+            await self._set_no_write(channel, victim, offender)
+
+        elif incident.state == State.CLOSED_PHASE:
+            await self.incident_steward_end_statement(guild, channel.id, incident.channel_id)
+            await self._set_all_write(channel, victim, offender)
+
 
     # =====================
     # events functions
@@ -886,7 +986,6 @@ class IncidentModule(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print('IncidentModule loaded')
-        self.incident_timeout.start()
 
 
 
@@ -956,7 +1055,7 @@ class IncidentModule(commands.Cog):
                 elif incident.state == State.VICTIM_PROOF and delta > timedelta(minutes=30):
                     # if this fails, the state-machine will not advance
                     # this will lead to continuous pinging of the victim (by design)
-                    await self.incident_notify_offender(guild, channel.id, incident.channel_id, check_proof_exists = False)
+                    await self.incident_notify_offender(guild, channel.id, incident.channel_id, check_proof_exists=False)
 
                 # offender got 2 day for initial statement
                 elif incident.state == State.OFFENDER_STATEMENT and delta > timedelta(days=2):
@@ -964,7 +1063,7 @@ class IncidentModule(commands.Cog):
 
                 # further 2 hours for upload of proof
                 elif incident.state == State.OFFENDER_PROOF and delta > timedelta(hours=2):
-                    await self.incident_notify_stewards(guild, channel.id, incident.channel_id)
+                    await self.incident_notify_stewards(guild, channel.id, incident.channel_id, check_proof_exists=False)
 
                 # the stewards got 2 days of reaction
                 elif incident.state == State.STEWARD_STATEMENT and delta > timedelta(days=5):
@@ -985,6 +1084,12 @@ class IncidentModule(commands.Cog):
                     if delta > timedelta(days=2):
                         await self.incident_delete(guild, inc_key)
 
+
+    @incident_timeout.before_loop
+    async def before_incident_timeout(self):
+        print('waiting...')
+        await self.client.wait_until_ready()
+        print('done')
 
 
     @commands.Cog.listener()
@@ -1022,13 +1127,13 @@ class IncidentModule(commands.Cog):
                 await self.incident_victim_proof(guild, channel.id, incident.channel_id)
 
             elif incident.state == State.VICTIM_PROOF and payload.member.id == incident.victim.u_id:
-                await self.incident_notify_offender(guild, channel.id, incident.channel_id, check_proof_exists = True)
+                await self.incident_notify_offender(guild, channel.id, incident.channel_id, check_proof_exists=True)
 
             elif incident.state == State.OFFENDER_STATEMENT and payload.member.id == incident.offender.u_id:
                 await self.incident_offender_proof(guild, channel.id, incident.channel_id)
 
             elif incident.state == State.OFFENDER_PROOF and payload.member.id == incident.offender.u_id:
-                await self.incident_notify_stewards(guild, channel.id, incident.channel_id)
+                await self.incident_notify_stewards(guild, channel.id, incident.channel_id, check_proof_exists=True)
 
             elif incident.state == State.STEWARD_STATEMENT and self._is_member_steward(payload.member, server.stewards_id):
                 await self.incident_steward_sumup(guild, channel.id, incident.channel_id)
@@ -1042,6 +1147,12 @@ class IncidentModule(commands.Cog):
         elif payload.emoji.name == '🔧':
             if incident.state == State.DISCUSSION_PHASE and self._is_member_steward(payload.member, server.stewards_id):
                 await self.incident_modify_outcome(guild, channel.id, incident.channel_id, payload.member)
+
+        elif payload.emoji.name == '⏪':
+            if self._is_member_steward(payload.member, server.stewards_id):
+                await self.revert_incident_state(guild, channel.id, incident.channel_id)
+            else:
+                await channel.send('Only stewards can revert the ticket state')
 
 
         # state 7 is closed incident with no further interaction
@@ -1073,3 +1184,4 @@ class IncidentModule(commands.Cog):
 
 def setup(client):
     client.add_cog(IncidentModule(client))
+

@@ -17,9 +17,21 @@ def get_guild_based_prefix(bot, msg: discord.Message):
         return '_'
 
 
+intents = discord.Intents.none()
+intents.guilds = True
+intents.members = True
+
+intents.messages = True
+intents.guild_messages = True
+intents.dm_messages = True
+
+intents.reactions = True
+intents.guild_reactions = True
+intents.dm_reactions = True
+
 
 token = open('token.txt', 'r').read()
-client = commands.Bot(command_prefix=get_guild_based_prefix, description='Report an incident to the stewards')
+client = commands.Bot(command_prefix=get_guild_based_prefix, description='Report an incident to the stewards', intents=intents)
 
 
 

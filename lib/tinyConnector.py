@@ -19,6 +19,7 @@ class Server:
     prefix = '*'
 
     statement_ch_id = None
+    log_ch_id = None
     incident_section_id = None
     stewards_id = None
     incident_cnt = 0
@@ -99,6 +100,7 @@ class TinyConnector:
                         'incident_section_id': guild.incident_section_id,
                         'stewards_id': guild.stewards_id,
                         'statement_ch_id': guild.statement_ch_id,
+                        'log_ch_id': guild.log_ch_id,
                         'incident_cnt': guild.incident_cnt,
                         'active_incidents': lib.data.incidents_to_json(guild.active_incidents)
                         })
@@ -114,6 +116,7 @@ class TinyConnector:
         server.incident_section_id = db_json.get('incident_section_id', None)
         server.stewards_id = db_json.get('stewards_id', None)
         server.statement_ch_id = db_json.get('statement_ch_id', None)
+        server.log_ch_id = db_json.get('log_ch_id', None)
         server.incident_cnt = db_json.get('incident_cnt', 0)
         server.active_incidents = lib.data.json_to_incidents(db_json.get('active_incidents', {}))
 

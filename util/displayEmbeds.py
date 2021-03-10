@@ -4,7 +4,7 @@ from lib.data import Incident, Driver
 
 
 def incident_embed(inc: Incident, title, description):
-    embed = discord.Embed(title=title[2:], description=description)
+    embed = discord.Embed(title=title, description=description)
 
 
     embed.add_field(name='Victim', value='{:s} - {:d}'.format(inc.victim.name, inc.victim.number), inline=True)
