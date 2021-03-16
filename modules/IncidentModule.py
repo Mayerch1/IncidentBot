@@ -56,6 +56,20 @@ class IncidentModule(commands.Cog):
                 pass
 
 
+    async def _test_msg_was_send(self, channel, tgt_author_id, bot_id):
+
+        # this iterates in reverse
+        # limit detection to last 5 messages (reducing latency cmp. to last 10 or 20)
+        async for message in channel.history(limit=5):
+            if message.author.id == bot_id:
+                return False
+
+            elif message.author.id == tgt_author_id:
+                return True
+
+        # the author did not send a message
+        return False
+
     #################################################
     ## Incident Setup - Set Config values, for admins
     #################################################
@@ -568,15 +582,15 @@ class IncidentModule(commands.Cog):
         channel = guild.get_channel(incident.channel_id)
 
         if check_proof_exists:
-            async for message in channel.history(limit=1):
-                if not message.author.id == incident.victim.u_id:
-                    m1 = await channel.send('Are you sure you don\'t want to add any proof?\nThe incident might get cancelled if no sufficient evidence is provided.')
-                    m2 = await channel.send('If you decide to not add further evidence, confirm this with a text message (e.g. `no evidence required`).')
-                    await m2.add_reaction('⏩')
+            if not await self._test_msg_was_send(channel, incident.victim.u_id, self.client.user.id):
 
-                    incident.cleanup_queue.extend([m1.id, m2.id])
-                    TinyConnector.update_incident(server.g_id, incident)
-                    return
+                m1 = await channel.send('Are you sure you don\'t want to add any proof?\nThe incident might get cancelled if no sufficient evidence is provided.')
+                m2 = await channel.send('If you decide to not add further evidence, confirm this with a text message (e.g. `no evidence required`) and react again.')
+                await m2.add_reaction('⏩')
+
+                incident.cleanup_queue.extend([m1.id, m2.id])
+                TinyConnector.update_incident(server.g_id, incident)
+                return
 
 
         # delete the old questions, this helps in keeping the channel clean
@@ -679,15 +693,18 @@ class IncidentModule(commands.Cog):
 
 
         if check_proof_exists:
-            async for message in channel.history(limit=1):
-                if not message.author.id == incident.offender.u_id:
-                    m1 = await channel.send('Are you sure you don\'t want to add any proof?')
-                    m2 = await channel.send('If all important footage is already posted, confirm this with a text message (e.g. `no further evidence`).')
-                    await m2.add_reaction('⏩')
+            if not await self._test_msg_was_send(channel, incident.offender.u_id, self.client.user.id):
+                m1 = await channel.send('Are you sure you don\'t want to add any proof?')
+                m2 = await channel.send('If all important footage is already posted, confirm this with a text message (e.g. `no further evidence`) and react  again.')
+                await m2.add_reaction('⏩')
 
-                    incident.cleanup_queue.extend([m1.id, m2.id])
-                    TinyConnector.update_incident(server.g_id, incident)
-                    return
+                incident.cleanup_queue.extend([m1.id, m2.id])
+                TinyConnector.update_incident(server.g_id, incident)
+                return
+
+
+
+
 
         # only advance if proof check passes
         incident.state = State.STEWARD_STATEMENT
@@ -1058,7 +1075,7 @@ class IncidentModule(commands.Cog):
                     await self.incident_notify_offender(guild, channel.id, incident.channel_id, check_proof_exists=False)
 
                 # offender got 2 day for initial statement
-                elif incident.state == State.OFFENDER_STATEMENT and delta > timedelta(days=2):
+                elif incident.state == State.OFFENDER_STATEMENT and delta > timedelta(days=1):
                     await self.incident_offender_proof(guild, channel.id, incident.channel_id)
 
                 # further 2 hours for upload of proof
