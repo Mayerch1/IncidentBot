@@ -226,7 +226,7 @@ class IncidentModule(commands.Cog):
         await cmd.channel.edit(name= '❌ ' + cmd.channel.name[1:])
 
 
-        TinyConnector.update_incident(incident)
+        TinyConnector.update_incident(cmd.guild.id, incident)
 
 
 
@@ -348,44 +348,54 @@ class IncidentModule(commands.Cog):
         incident.victim.u_id = cmd.author.id
 
 
-        q = await dm.send('State the Game- and Race-name:')
-        r = await get_client_response(self.client, q, 300, cmd.author)
+        q = await dm.send(embed=discord.Embed(title='State the Game- and Race-name'))
+        r = await get_client_response(self.client, q, 600, cmd.author)
 
         if r is None:
             return None
 
         incident.race_name = r
 
-        q = await dm.send('State your drivers in-game name:')
-        r = await get_client_response(self.client, q, 300, cmd.author)
+        q = await dm.send(embed=discord.Embed(title='State your drivers in-game name'))
+        r = await get_client_response(self.client, q, 600, cmd.author)
 
         if r is None:
             return None
         incident.victim.name = r
 
-        q = await dm.send('State your car number:')
-        r = await get_client_response(self.client, q, 300, cmd.author, lambda x: x.isdigit())
+        q = await dm.send(embed=discord.Embed(title='State your car number', description='Only digits are allowed'))
+        r = await get_client_response(self.client, q, 600, cmd.author, lambda x: x.isdigit())
 
         if r is None:
             return None
         incident.victim.number = int(r)
 
-        q = await dm.send('State the other drivers name:')
-        r = await get_client_response(self.client, q, 300, cmd.author)
+
+        q = await dm.send(embed=discord.Embed(title='State the other drivers name'))
+        r = await get_client_response(self.client, q, 600, cmd.author)
 
         if r is None:
             return None
         incident.offender.name = r
 
-        q = await dm.send('State the other drivers number:')
-        r = await get_client_response(self.client, q, 300, cmd.author, lambda x: x.isdigit())
+        q = await dm.send(embed=discord.Embed(title='State the other drivers number', description='Only digits are allowed'))
+        r = await get_client_response(self.client, q, 600, cmd.author, lambda x: x.isdigit())
 
         if r is None:
             return None
         incident.offender.number = int(r)
 
-        q = await dm.send('If possible, state the race lap and corner, (- if unspecified).')
-        r = await get_client_response(self.client, q, 300, cmd.author)
+
+        q = await dm.send(embed=discord.Embed(title='State the incident classification', description='according to [rule 4.1](https://docs.google.com/document/d/1VJUtz6EFFXpEP-VS2--kDzZks8YcBrUL8xs4Bm9smVk/edit#bookmark=id.r2jbeek7bvkc)'))
+        r = await get_client_response(self.client, q, 600, cmd.author)
+
+        if r is None:
+            return None
+        incident.infringement = r
+
+
+        q = await dm.send(embed=discord.Embed(title='If possible, state the race lap and corner', description='\'-\' if unspecified'))
+        r = await get_client_response(self.client, q, 600, cmd.author)
 
         if r is None:
             return None
@@ -422,12 +432,12 @@ class IncidentModule(commands.Cog):
         abort_loop = False
         while not abort_loop:
 
-            reaction = await get_client_reaction(self.client, embed_msg, 300, cmd.author, ['✅', '❌', '🔧'])
+            reaction = await get_client_reaction(self.client, embed_msg, 600, cmd.author, ['✅', '❌', '🔧'])
 
             # give the author a second chance
             if reaction is None:
-                await dm.send('If you do not confirm this ticket, it will be aborted in 5 minutes.')
-                reaction = await get_client_reaction(self.client, embed_msg, 300, cmd.author, ['✅', '❌', '🔧'])
+                await dm.send('If you do not confirm this ticket, it will be aborted in 10 minutes.')
+                reaction = await get_client_reaction(self.client, embed_msg, 600, cmd.author, ['✅', '❌', '🔧'])
 
 
             if reaction is None or reaction == '❌':
@@ -439,7 +449,7 @@ class IncidentModule(commands.Cog):
                 incident = await self.incident_flow_raw(cmd, dm)
                 embed_msg = await dm.send(embed=incident_embed(incident, "Event details", incident.race_name))
             elif reaction == '✅':
-                await dm.send('You completed the ticket initialization. Please head back to the server to enter the incident details.')
+                await dm.send('You completed the ticket initialization. Please head back to the server to enter further incident details.')
                 await dm.send('I tagged you in the appropriate incident channel.')
                 abort_loop = True
 
@@ -761,10 +771,10 @@ class IncidentModule(commands.Cog):
         TinyConnector.update_incident(server.g_id, incident)
 
 
-        q1 = await channel.send('<@&{:d}> please state the category of infringement which was judged in 1 short sentence (e.g. \'causing a collision\', \'abuse of track limits\', ...)'.format(server.stewards_id))
+        q1 = await channel.send('<@&{:d}> please state the type of this incident (driver reported as `{:s}`)'.format(server.stewards_id, incident.infringement))
         category = await get_client_response(self.client, q1, 300)
 
-        q2 = await channel.send('<@&{:d}> please state the action taken in 1 short sentence (e.g. \'1st warning\', \'racing incident\', ...)'.format(server.stewards_id))
+        q2 = await channel.send('<@&{:d}> please state the outcome (and resulting penalty)'.format(server.stewards_id))
         outcome = await get_client_response(self.client, q2, 300)
 
 
