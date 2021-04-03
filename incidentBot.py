@@ -1,6 +1,9 @@
 
 import discord
 from discord.ext import commands
+from discord_slash import SlashCommand, SlashContext
+
+
 
 from util.verboseErrors import VerboseErrors
 from lib.tinyConnector import TinyConnector
@@ -32,6 +35,7 @@ intents.dm_reactions = True
 
 token = open('token.txt', 'r').read()
 client = commands.Bot(command_prefix=get_guild_based_prefix, description='Report an incident to the stewards', intents=intents)
+slash = SlashCommand(client, sync_commands=True, override_type=True)
 
 
 
@@ -57,6 +61,7 @@ async def on_guild_remove(guild):
     TinyConnector._delete_guild(guild.id)
 
 
+"""
 @client.command(name='prefix', help = 'change the prefix')
 @commands.has_guild_permissions(administrator=True)
 @commands.guild_only()
@@ -71,6 +76,7 @@ async def set_prefix(cmd, *prefix):
     TinyConnector.update_guild(server)
 
     await cmd.send('New prefix is `{:s}`'.format(server.prefix))
+"""
 
 
 

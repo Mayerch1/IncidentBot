@@ -6,6 +6,9 @@ from datetime import datetime, timedelta
 
 import discord
 from discord.ext import commands, tasks
+from discord_slash import cog_ext, SlashContext
+from discord_slash.utils.manage_commands import create_option, create_choice
+from discord_slash import SlashCommandOptionType
 
 
 from lib.tinyConnector import TinyConnector
@@ -70,123 +73,6 @@ class IncidentModule(commands.Cog):
         # the author did not send a message
         return False
 
-    #################################################
-    ## Incident Setup - Set Config values, for admins
-    #################################################
-
-
-    async def setup_category(self, cmd):
-
-        q = await cmd.send('Please enter the name of the channel-category used for incidents.')
-        resp = await get_client_response(self.client, q, 120, cmd.author)
-
-        if resp is None:
-            return
-
-        section = await guess_target_section(cmd, resp, cmd.guild.channels, cmd.channel, True)
-
-        if section is None:
-            await cmd.send('Failed to set the category channel')
-            return
-
-        await cmd.send('The incident category will be `{:s}`'.format(section.name))
-
-        server = TinyConnector.get_guild(cmd.guild.id)
-        server.incident_section_id = section.id
-        TinyConnector.update_guild(server)
-
-
-
-    async def setup_summary_ch(self, cmd):
-
-        q = await cmd.send('Please enter the name of the summary channel, used for publishing ticket summaries')
-        resp = await get_client_response(self.client, q, 120, cmd.author)
-
-        channel = await guess_target_text(cmd, resp, cmd.guild.channels, cmd.channel, True)
-
-        if channel is None:
-            await cmd.send('Failed to set the summary channel')
-            return
-
-        await cmd.send('The summary channel will be `{:s}`'.format(channel.name))
-
-
-        server = TinyConnector.get_guild(cmd.guild.id)
-        server.statement_ch_id = channel.id
-        TinyConnector.update_guild(server)
-
-
-    async def setup_log_ch(self, cmd):
-
-        q = await cmd.send('Please enter the name of the log channel, used for publishing ticket logs')
-        resp = await get_client_response(self.client, q, 120, cmd.author)
-
-        channel = await guess_target_text(cmd, resp, cmd.guild.channels, cmd.channel, True)
-
-        if channel is None:
-            await cmd.send('Failed to set the log channel')
-            return
-
-        await cmd.send('The log channel will be `{:s}`'.format(channel.name))
-
-
-        server = TinyConnector.get_guild(cmd.guild.id)
-        server.log_ch_id = channel.id
-        TinyConnector.update_guild(server)
-
-
-    async def setup_stewards(self, cmd):
-
-        def is_role_mention(input):
-            match = re.findall("@&\d+", input)
-            return (len(match) > 0)
-
-
-        q = await cmd.send('Please tag the steward role used for incident handling.')
-        resp = await get_client_response(self.client, q, 120, cmd.author, is_role_mention)
-
-        steward_id = re.findall('@&\d+', resp)[0][2:]
-
-
-        server = TinyConnector.get_guild(cmd.guild.id)
-        server.stewards_id = int(steward_id)
-        TinyConnector.update_guild(server)
-
-
-
-
-
-
-    async def setup(self, cmd, mode):
-
-        if not cmd.author.guild_permissions.administrator:
-            await cmd.send('You do not have permissions to execute this command')
-            return
-
-        if mode:
-            if mode[0] == 'category':
-                await self.setup_category(cmd)
-
-            elif mode[0] == 'stewards':
-                await self.setup_stewards(cmd)
-
-            elif mode[0] == 'summary':
-                await self.setup_summary_ch(cmd)
-
-            elif mode[0] == 'log':
-                await self.setup_log_ch(cmd)
-
-            else:
-                await cmd.send(IncidentModule.SETUP_HELP)
-
-        else:
-            await self.setup_category(cmd)
-            await self.setup_stewards(cmd)
-            await self.setup_summary_ch(cmd)
-            await self.setup_log_ch(cmd)
-
-
-        await ack_message(cmd.message)
 
 
 
@@ -194,7 +80,7 @@ class IncidentModule(commands.Cog):
     ## Cancel an active ticket - if permissions avail
     #################################################
 
-    async def cancel(self, cmd, mode):
+    async def cancel(self, cmd):
 
         server = TinyConnector.get_guild(cmd.guild.id)
         incident = server.active_incidents.get(cmd.channel.id, None)
@@ -308,16 +194,13 @@ class IncidentModule(commands.Cog):
             return
 
 
-
+        # channel is visible for all
+        # cmd.send is not
         await cmd.send('I have sent you a DM to continue the ticket process.')
-        await cmd.send('This incident is now looked at by the stewards. There\'s no need for further discussions in this channel.')
+        await cmd.channel.send('This incident is now looked at by the stewards. There\'s no need for further discussions in this channel.')
 
         if dm is None:
             return
-
-        # confirm the message and carry on in dms
-        await ack_message(cmd.message)
-
 
         incident = await self.incident_setup_dm(cmd, dm)
         if incident is None:
@@ -1191,22 +1074,129 @@ class IncidentModule(commands.Cog):
     # commands functions
     # =====================
 
-    @commands.command(name='incident', help='Open Event-registration')
-    @commands.guild_only()
-    @commands.has_guild_permissions()
-    async def incident_cmd(self, cmd, *mode):
+    @cog_ext.cog_subcommand(base='incident', name='report',
+                             options=[
+                                create_option(
+                                    name="offender",
+                                    description='the driver causing the incident',
+                                    option_type=SlashCommandOptionType.USER,
+                                    required=True,
 
-        if mode and mode[0] == 'cancel':
-            await self.cancel(cmd, mode[1:])
+                                )
+                            ])
+    async def incident_report(self, ctx: SlashContext, offender):
+        await self.incident(ctx, offender.id)
 
-        elif mode and mode[0] == 'setup':
-            await self.setup(cmd, mode[1:])
 
-        elif len(cmd.message.mentions) > 0:
-            await self.incident(cmd, cmd.message.mentions[0].id)
+    @cog_ext.cog_subcommand(base='incident', name='cancel')
+    async def incident_cancel(self, ctx: SlashContext):
+        await self.cancel(ctx)
 
-        else:
-            await cmd.send(IncidentModule.INC_HELP)
+
+
+    @cog_ext.cog_subcommand(base='incident', subcommand_group='setup', name='roles', description='specify the steward role',
+                            options=[
+                                create_option(
+                                    name='mode',
+                                    description='select the operation mode',
+                                    required=True,
+                                    option_type=SlashCommandOptionType.STRING,
+                                    choices=[
+                                        create_choice(
+                                            name='steward role',
+                                            value='steward'
+                                        )
+                                    ]
+
+                                ),
+                                create_option(
+                                    name='role',
+                                    description='the mention of the role to set',
+                                    required=True,
+                                    option_type=SlashCommandOptionType.ROLE
+                                )
+                            ])
+    async def incident_setup_steward(self, ctx: SlashContext, mode, role):
+
+        if not ctx.author.guild_permissions.administrator:
+            await ctx.send('You do not have permissions to execute this command')
+            return
+
+        if mode == 'steward':
+            server = TinyConnector.get_guild(ctx.guild.id)
+            server.stewards_id = int(role.id)
+            TinyConnector.update_guild(server)
+
+            await ctx.send(f'New steward role is {role.mention}')
+
+
+
+
+    @cog_ext.cog_subcommand(base='incident', subcommand_group='setup', name='channels',
+                                options=[
+                                    create_option(
+                                        name='mode',
+                                        description='set the operation mode',
+                                        required=True,
+                                        option_type=SlashCommandOptionType.STRING,
+                                        choices=[
+                                            create_choice(
+                                                name='ticket category',
+                                                value='category'
+                                            ),
+                                            create_choice(
+                                                name='summary channel',
+                                                value='summary'
+                                            ),
+                                            create_choice(
+                                                name='log channel',
+                                                value='log'
+                                            )
+                                        ]
+                                    ),
+                                    create_option(
+                                        name='channel',
+                                        description='the channel of the selected mode',
+                                        required=True,
+                                        option_type=SlashCommandOptionType.CHANNEL
+
+                                    )
+                                ])
+    async def incident_setup_ticket(self, ctx: SlashContext, mode, channel):
+
+        if not ctx.author.guild_permissions.administrator:
+            await ctx.send('You do not have permissions to execute this command')
+            return
+
+        server = TinyConnector.get_guild(ctx.guild.id)
+
+
+        if mode == 'category':
+            if not isinstance(channel, discord.CategoryChannel):
+                await ctx.send('you need to specify a category, not a channel')
+                return
+
+            server.incident_section_id = channel.id
+            await ctx.send('The incident category will be `{:s}`'.format(channel.name))
+
+        elif mode == 'summary':
+            if not isinstance(channel, discord.TextChannel):
+                await ctx.send('you need to specify a text channel')
+                return
+
+            server.statement_ch_id = channel.id
+            await ctx.send('The summary channel will be `{:s}`'.format(channel.name))
+
+        elif mode == 'log':
+            if not isinstance(channel, discord.TextChannel):
+                await ctx.send('you need to specify a text channel')
+                return
+
+            server.log_ch_id = channel.id
+            await ctx.send('The log channel will be `{:s}`'.format(channel.name))
+
+
+        TinyConnector.update_guild(server)
 
 
 def setup(client):
