@@ -1074,7 +1074,7 @@ class IncidentModule(commands.Cog):
     # commands functions
     # =====================
 
-    @cog_ext.cog_subcommand(base='incident', name='report',
+    @cog_ext.cog_subcommand(base='incident', name='report', description='open a new incident report against another driver',
                              options=[
                                 create_option(
                                     name="offender",
@@ -1088,13 +1088,13 @@ class IncidentModule(commands.Cog):
         await self.incident(ctx, offender.id)
 
 
-    @cog_ext.cog_subcommand(base='incident', name='cancel')
+    @cog_ext.cog_subcommand(base='incident', name='cancel', description='cancel an active incident')
     async def incident_cancel(self, ctx: SlashContext):
         await self.cancel(ctx)
 
 
 
-    @cog_ext.cog_subcommand(base='incident', subcommand_group='setup', name='roles', description='specify the steward role',
+    @cog_ext.cog_subcommand(base='incident', subcommand_group='setup', name='roles', description='setup the incident roles (admin)',
                             options=[
                                 create_option(
                                     name='mode',
@@ -1132,7 +1132,7 @@ class IncidentModule(commands.Cog):
 
 
 
-    @cog_ext.cog_subcommand(base='incident', subcommand_group='setup', name='channels',
+    @cog_ext.cog_subcommand(base='incident', subcommand_group='setup', name='channels', description='setup tho incident channels (admin)',
                                 options=[
                                     create_option(
                                         name='mode',
