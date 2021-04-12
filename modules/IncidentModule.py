@@ -381,7 +381,7 @@ class IncidentModule(commands.Cog):
             print('steward permission:')
             print(e)
 
-        await self._set_victim_write(inc_channel, cmd.message.author, offender)
+        await self._set_victim_write(inc_channel, cmd.author, offender)
 
         try:
             await inc_channel.set_permissions(cmd.guild.default_role, read_messages=False, send_messages=False, read_message_history=False)
