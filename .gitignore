@@ -1,4 +1,5 @@
 # sensitive data
+archive/
 **/token.txt
 **/log.txt
 **/servers.json

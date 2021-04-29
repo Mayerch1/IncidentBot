@@ -1,13 +1,63 @@
 # ./docker-compose.yml
 version: '3.3'
+
+networks:
+    ibot:
+        external: false
+
 services:
   bot:
     build: .
     container_name: incidentBot-discord
+    environment:
+      - FS_PASSCODE_PORT
+      - FS_SECRET
+      - FS_ARCHIVE_DIRECTORY
+      - ARCHIVE_CONTAINER=web
     volumes:
-           - ./:/code
-
+      - ./:/code
+      - $LOCAL_ARCHIVE_DIRECTORY/:$FS_ARCHIVE_DIRECTORY
     stdin_open: true
     tty: true
     restart: always
+    networks:
+      - ibot
+
+  web:
+    build: ./wolfpack-file-server
+    expose:
+      - $FS_ARCHIVE_PORT
+      - $FS_PASSCODE_PORT
+    volumes:
+      - $LOCAL_ARCHIVE_DIRECTORY/:$FS_ARCHIVE_DIRECTORY
+      - $LOCAL_LOG_DIRECTORY:$FS_LOG_DIRECTORY
+    environment:
+      - FS_LOG_DIRECTORY
+      - FS_ARCHIVE_DIRECTORY
+      - FS_PASSCODE_PORT
+      - FS_ARCHIVE_PORT
+      - FS_SECRET
+      - FS_HOST
+    networks:
+      - ibot
+
+  frontend:
+    build: ./wolfpack-file-server/file-server-frontend
+    depends_on:
+      - web
+    environment:
+      LETSENCRYPT_EMAIL: mail@domain.tld
+      LETSENCRYPT_HOST: sub.domain.tld
+      VIRTUAL_HOST: sub.domain.tld
+      VIRTUAL_PORT: 4200
+    expose:
+      - 4200
+    ports:
+      - 4200:4200
+    networks:
+      - ibot
+
+
+
+
 

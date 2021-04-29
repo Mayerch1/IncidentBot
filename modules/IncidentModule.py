@@ -1,6 +1,7 @@
 import os
 import re
 import io
+import requests
 
 from datetime import datetime, timedelta
 
@@ -14,6 +15,8 @@ from discord_slash import SlashCommandOptionType
 from lib.tinyConnector import TinyConnector
 from lib.data import Incident, Driver, State
 
+from consts import Consts
+
 
 from util.verboseErrors import VerboseErrors
 from util.interaction import ack_message, guess_target_section, guess_target_text, get_client_response, get_client_reaction, wait_confirm_deny
@@ -21,6 +24,18 @@ from util.interaction import ack_message, guess_target_section, guess_target_tex
 from util.displayEmbeds import incident_embed
 from util.htm_gen import gen_html_report
 
+
+fileserver_whitelist = [140150091607441408, 722746405453692989]
+
+archive_directory = os.getenv("FS_ARCHIVE_DIRECTORY")
+passcode_port = os.getenv("FS_PASSCODE_PORT")
+archive_secret = os.getenv("FS_SECRET")
+passcode_host = os.getenv("ARCHIVE_CONTAINER")
+
+print(f'arch_directory: {archive_directory}')
+print(f'archive_secret: {archive_secret}')
+print(f'passcode_port: {passcode_port}')
+print(f'passcode_host: {passcode_host}')
 
 class IncidentModule(commands.Cog):
 
@@ -780,7 +795,7 @@ class IncidentModule(commands.Cog):
         incident.state = State.CLOSED_PHASE
         incident.locked_time = datetime.now().timestamp()
 
-        TinyConnector.update_incident(guild.id, incident)
+        #TinyConnector.update_incident(guild.id, incident)
 
 
         # incident id is channel id
@@ -795,15 +810,29 @@ class IncidentModule(commands.Cog):
         await channel.send('The ticket is closed, please do not interact with this channel anymore.')
 
 
+        # wolfpack specific file server
         if server.log_ch_id:
             log_ch = guild.get_channel(server.log_ch_id)
 
-            # post the report summary in the incident channel, until the design is improved
-            html_str = await gen_html_report(channel, incident.victim.u_id, incident.offender.u_id, server.stewards_id, self.client.user.id)
+            if guild.id in fileserver_whitelist:
+                html_str = await gen_html_report(channel, incident.victim.u_id, incident.offender.u_id, server.stewards_id, self.client.user.id)
 
-            if html_str:
-                f_p = io.StringIO(html_str)
-                await log_ch.send(file=discord.File(fp=f_p, filename=channel.name[2:] + '.html'))
+                if html_str:
+                    # generate folder structure and url
+                    file_path = f'{channel.name[2:]}.html'
+                    with open(f'{archive_directory}/{file_path}', 'w', encoding='utf-8') as fp:
+                        fp.write(html_str)
+
+                    await log_ch.send('request access to the ticket log with `/incident logs`')
+
+            # all other servers
+            else:
+                # post the report summary in the incident channel, until the design is improved
+                html_str = await gen_html_report(channel, incident.victim.u_id, incident.offender.u_id, server.stewards_id, self.client.user.id)
+
+                if html_str:
+                    f_p = io.StringIO(html_str)
+                    await log_ch.send(file=discord.File(fp=f_p, filename=channel.name[2:] + '.html'))
 
 
         await channel.edit(name= '🔒 ' + channel.name[1:])
@@ -939,8 +968,6 @@ class IncidentModule(commands.Cog):
 
         for guild in self.client.guilds:
             server = TinyConnector.get_guild(guild.id)
-
-
 
             for inc_key in server.active_incidents:
                 incident = server.active_incidents[inc_key]
@@ -1091,6 +1118,47 @@ class IncidentModule(commands.Cog):
     @cog_ext.cog_subcommand(base='incident', name='cancel', description='cancel an active incident')
     async def incident_cancel(self, ctx: SlashContext):
         await self.cancel(ctx)
+
+
+    @cog_ext.cog_subcommand(base='incident', name='logs', description='get access to the incident logs')
+    @commands.guild_only()
+    async def incident_archive(self, ctx: SlashContext):
+
+        if ctx.guild.id not in fileserver_whitelist:
+            await ctx.send('this server is not whitelisted for archive usage')
+            return
+
+        # the server will generate the authentication
+        url = f'http://{passcode_host}:{passcode_port}/passcode'
+        print(f'request to {url}')
+        try:
+            resp = requests.get(url, json={"secret": archive_secret})
+        except:
+            await ctx.send('Failed to create login credentials, please contact a moderator to resolve this issue')
+            return
+
+        if resp.status_code == 200:
+            redirect = resp.content.decode('utf-8')
+            redirect = redirect.replace(':4200', '') #TODO: workaround for unused port (reverse proxy doesn't need port)
+
+            # try to send the link via dm
+            # there's no fallback for a dm as the link shouldn't go public
+            # a warning is issued on failure
+            dm = await ctx.author.create_dm()
+            try:
+                await dm.send(redirect)
+            except discord.errors.Forbidden as e:
+                embed = discord.Embed(title='Missing DM Permission',
+                                        description='Please [change your preferences]({:s}) and invoke this '\
+                                                    'command again.\n You can revert the changes after you\'ve received the url to the archive.'
+                                                    .format(r'https://support.discord.com/hc/en-us/articles/217916488-Blocking-Privacy-Settings-'),
+                                        color=0xff0000)
+                await ctx.send(embed = embed)
+                return
+
+            await ctx.send('I\'ve send you a temporary link to the archive')
+        else:
+            await ctx.send(f'Failed to create login credentials (code {resp.status_code}), please contact a moderator to resolve this issue')
 
 
 

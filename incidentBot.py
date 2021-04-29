@@ -55,6 +55,12 @@ async def on_ready():
 
 
 
+@client.event
+async def on_slash_command_error(ctx, error):
+
+    if isinstance(error, discord.ext.commands.errors.NoPrivateMessage):
+        await ctx.send('This command is only to be used on servers')
+
 
 @client.event
 async def on_guild_remove(guild):

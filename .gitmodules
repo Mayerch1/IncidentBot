@@ -1,0 +1,3 @@
+[submodule "wolfpack-file-server"]
+	path = wolfpack-file-server
+	url = https://github.com/ruairigibney/wolfpack-file-server

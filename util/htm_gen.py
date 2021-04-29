@@ -76,7 +76,7 @@ async def gen_html_report(channel, victim_id, offender_id, steward_id, bot_id):
         missed_embeds = 0
 
         for embed in msg.embeds:
-            if embed.type == 'rich':
+            if embed.type == 'rich' and embed.description != discord.Embed.Empty:
                 embed_content = '			<div class="embed">\n'\
                                 '  			  <div></div>\n'\
                                 '  			    <div>\n'\
