@@ -32,10 +32,10 @@ passcode_port = os.getenv("FS_PASSCODE_PORT")
 archive_secret = os.getenv("FS_SECRET")
 passcode_host = os.getenv("ARCHIVE_CONTAINER")
 
-print(f'arch_directory: {archive_directory}')
-print(f'archive_secret: {archive_secret}')
-print(f'passcode_port: {passcode_port}')
-print(f'passcode_host: {passcode_host}')
+# print(f'arch_directory: {archive_directory}')
+# print(f'archive_secret: {archive_secret}')
+# print(f'passcode_port: {passcode_port}')
+# print(f'passcode_host: {passcode_host}')
 
 class IncidentModule(commands.Cog):
 
@@ -795,7 +795,7 @@ class IncidentModule(commands.Cog):
         incident.state = State.CLOSED_PHASE
         incident.locked_time = datetime.now().timestamp()
 
-        #TinyConnector.update_incident(guild.id, incident)
+        TinyConnector.update_incident(guild.id, incident)
 
 
         # incident id is channel id

@@ -9,7 +9,10 @@
             "type": "python",
             "request": "launch",
             "program": "incidentBot.py",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "env": {
+                "ARCHIVE_CONTAINER": "localhost"
+            }
         }
     ]
 }
