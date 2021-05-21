@@ -823,7 +823,7 @@ class IncidentModule(commands.Cog):
                     with open(f'{archive_directory}/{file_path}', 'w', encoding='utf-8') as fp:
                         fp.write(html_str)
 
-                    await log_ch.send('request access to the ticket log with `/incident logs`')
+                    await log_ch.send('get a link to the ticket log with `/incident logs`')
 
             # all other servers
             else:
