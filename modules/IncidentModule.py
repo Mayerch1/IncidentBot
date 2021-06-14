@@ -549,7 +549,6 @@ class IncidentModule(commands.Cog):
 
 
 
-
     async def incident_offender_proof(self, guild, channel_id, incident_id):
 
         server = TinyConnector.get_guild(guild.id)
@@ -611,9 +610,6 @@ class IncidentModule(commands.Cog):
                 return
 
 
-
-
-
         # only advance if proof check passes
         incident.state = State.STEWARD_STATEMENT
 
@@ -668,6 +664,8 @@ class IncidentModule(commands.Cog):
 
         TinyConnector.update_incident(server.g_id, incident)
 
+        if incident.infringement is None:
+            incident.infringement = 'Not specified'
 
         q1 = await channel.send('<@&{:d}> please state the type of this incident (driver reported as `{:s}`)'.format(server.stewards_id, incident.infringement))
         category = await get_client_response(self.client, q1, 300)
@@ -680,9 +678,9 @@ class IncidentModule(commands.Cog):
         server = TinyConnector.get_guild(guild.id)
         incident = server.active_incidents[incident_id]
 
-        # even assign on None
-        incident.outcome = outcome
-        incident.infringement = category
+        # do not assign None, but use old/placeholder values
+        incident.outcome = outcome if outcome else "N/A"
+        incident.infringement = category if category else incident.infringement + ' (as by victim)'
 
         incident.cleanup_queue.extend([q1.id, q2.id])
 
