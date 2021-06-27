@@ -45,6 +45,8 @@ class IncidentSetup(commands.Cog):
         # negative numbers will never be hit by the cyclic advance
         exit_abort = -1
         exit_success =  -2
+        exit_timeout = -3
+        exit_unexpected = -4
 
 
         def max_enum_val(self):
@@ -179,6 +181,23 @@ class IncidentSetup(commands.Cog):
 
         await stm.question_msg.edit(components=[stm.navigation_row])
 
+
+    async def _abort_unexpected_stm(self, stm):
+        await stm.dm.send('Unexpected error ocurred. Please try again and contact a bot-moderator.')
+
+        for c in stm.navigation_row['components']:
+            c['disabled'] = True
+
+        await stm.question_msg.edit(components=[stm.navigation_row])
+
+
+    async def _timeout_stm(self, stm):
+        await stm.dm.send('The ticket timeout was exceeded. You can start the process again by reinvoking the command.')
+
+        for c in stm.navigation_row['components']:
+            c['disabled'] = True
+
+        await stm.question_msg.edit(components=[stm.navigation_row])
 
     async def _success_stm(self, stm):
 
@@ -357,7 +376,7 @@ class IncidentSetup(commands.Cog):
             def msg_check(msg):
                 return msg.author.id == stm.dm.recipient.id and msg.channel.id == stm.dm.id
 
-            pending_tasks = [manage_components.wait_for_component(self.client, components=stm.navigation_row),
+            pending_tasks = [manage_components.wait_for_component(self.client, components=stm.navigation_row, timeout=10*60),
                             self.client.wait_for('message',check=msg_check)]
 
             done_tasks, pending_tasks = await asyncio.wait(pending_tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -376,30 +395,40 @@ class IncidentSetup(commands.Cog):
             ex = first_task.exception()
 
             # ignore all other tasks
-            # reading the exception should silence console error output
             while done_tasks:
                 task = done_tasks.pop()
                 task.cancel()
-                _ = task.exception()
+                _ = task.exception()  # reading this silences console/log warnings
 
             if ex:
-                print(ex)
-                return
+                if isinstance(ex, asyncio.exceptions.TimeoutError):
+                    stm.state = IncidentSetup.SetupState.exit_timeout
+                else:
+                    stm.state = IncidentSetup.SetupState.exit_unexpected
+            else:
 
-            result = await first_task
+                result = await first_task
 
-            if isinstance(result, ComponentContext):
-                await self.process_navigation(result, stm)
-            elif isinstance(result, discord.Message):
-                re_send_msg = await self.process_msg(result, stm)
+                if isinstance(result, ComponentContext):
+                    await self.process_navigation(result, stm)
+                elif isinstance(result, discord.Message):
+                    re_send_msg = await self.process_msg(result, stm)
 
 
             if stm.state == IncidentSetup.SetupState.exit_abort:
                 await self._abort_stm(stm)
                 return
+            elif stm.state == IncidentSetup.SetupState.exit_timeout:
+                await self._timeout_stm(stm)
+                return
+            elif stm.state == IncidentSetup.SetupState.exit_unexpected:
+                await self._abort_unexpected_stm(stm)
+                return
             elif stm.state == IncidentSetup.SetupState.exit_success:
                 await self._success_stm(stm)
                 return
+
+
 
 
 
