@@ -145,7 +145,7 @@ class IncidentModule(commands.Cog):
 
         await cmd.send('This incident is now marked as closed. It will be deleted soon.')
         incident.state = State.CLOSED_PHASE
-        incident.locked_time = datetime.now().timestamp()
+        incident.locked_time = datetime.utcnow().timestamp()
 
         # the incident channel is the command channel
         await cmd.channel.edit(name= '❌ ' + cmd.channel.name[1:])
@@ -257,7 +257,7 @@ class IncidentModule(commands.Cog):
         # fake a text message
         # this will reset the state-machine watchdog
         # otherwise it would trigger this message at each iteration, after it was aborted once
-        t = datetime.now()
+        t = datetime.utcnow()
         incident.last_msg = t.timestamp()
 
 
@@ -523,7 +523,7 @@ class IncidentModule(commands.Cog):
         incident = server.active_incidents[incident_id]
 
         incident.state = State.CLOSED_PHASE
-        incident.locked_time = datetime.now().timestamp()
+        incident.locked_time = datetime.utcnow().timestamp()
 
         TinyConnector.update_incident(guild.id, incident)
 
@@ -675,7 +675,7 @@ class IncidentModule(commands.Cog):
             incident.cleanup_queue.append(m.id)
 
         # timeout counter for closing the incident
-        t = datetime.now()
+        t = datetime.utcnow()
         incident.last_msg = t.timestamp()
 
         TinyConnector.update_incident(server.g_id, incident)
@@ -684,11 +684,13 @@ class IncidentModule(commands.Cog):
 
     @tasks.loop(minutes=5)
     async def incident_timeout(self):
-        t = datetime.now()
+        t = datetime.utcnow()
 
         for guild in self.client.guilds:
             server = TinyConnector.get_guild(guild.id)
 
+            # deleting keys of server will not change the db
+            # therefore this iteration is save
             for inc_key in server.active_incidents:
                 incident = server.active_incidents[inc_key]
 

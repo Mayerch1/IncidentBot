@@ -31,7 +31,7 @@ class Incident:
         self.victim = None
         self.lap = 0
         self.state = State.VICTIM_STATEMENT
-        self.last_msg = datetime.datetime.now().timestamp()
+        self.last_msg = datetime.datetime.utcnow().timestamp()
         self.locked_time = 0
         self.cleanup_queue = []
 

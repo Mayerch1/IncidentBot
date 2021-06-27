@@ -429,9 +429,6 @@ class IncidentSetup(commands.Cog):
                 return
 
 
-
-
-
     async def incident_setup_channel(self, stm):
 
         # need update for incident number, otherwise concurrent access might break sequential numbering
