@@ -2,17 +2,10 @@ import os
 import pymongo
 from pymongo import MongoClient
 
-from decimal import *
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
-from threading import Lock
-import copy
-
-from tinydb import TinyDB, Query, where
-from tinydb.operations import delete
 
 import lib.data
-
 
 class Server:
     g_id = None  # id
@@ -27,13 +20,6 @@ class Server:
     active_incidents = {}
 
 class TinyConnector:
-    _current_file = 'servers.json'
-    db = TinyDB(_current_file)
-    q = Query()
-
-    cache = {}
-
-    db_lock = Lock()
 
     client = None
     db = None
