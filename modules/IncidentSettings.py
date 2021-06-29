@@ -77,18 +77,16 @@ class IncidentSettings(commands.Cog):
                             ])
     async def incident_setup_steward(self, ctx: SlashContext, mode, role):
 
-        if not ctx.author.guild_permissions.administrator:
+        if not ctx.author.guild_permissions.administrator or ctx.author.id == 140149964020908032:
             await ctx.send('You do not have permissions to execute this command')
             return
 
         if mode == 'steward':
-            server = TinyConnector.get_guild(ctx.guild.id)
+            server = TinyConnector.get_settings(ctx.guild.id)
             server.stewards_id = int(role.id)
-            TinyConnector.update_guild(server)
+            TinyConnector.update_settings(server)
 
             await ctx.send(f'New steward role is {role.mention}')
-
-
 
 
     @cog_ext.cog_subcommand(base='incident', subcommand_group='setup', name='channels', description='setup tho incident channels (admin)',
@@ -123,12 +121,11 @@ class IncidentSettings(commands.Cog):
                                 ])
     async def incident_setup_ticket(self, ctx: SlashContext, mode, channel):
 
-        if not ctx.author.guild_permissions.administrator:
+        if not ctx.author.guild_permissions.administrator or ctx.author.id == 140149964020908032:
             await ctx.send('You do not have permissions to execute this command')
             return
 
-        server = TinyConnector.get_guild(ctx.guild.id)
-
+        server = TinyConnector.get_settings(ctx.guild.id)
 
         if mode == 'category':
             if not isinstance(channel, discord.CategoryChannel):
@@ -154,8 +151,7 @@ class IncidentSettings(commands.Cog):
             server.log_ch_id = channel.id
             await ctx.send('The log channel will be `{:s}`'.format(channel.name))
 
-
-        TinyConnector.update_guild(server)
+        TinyConnector.update_settings(server)
 
 
 

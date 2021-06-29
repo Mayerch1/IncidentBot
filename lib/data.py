@@ -1,7 +1,19 @@
 import json
-import datetime
+from datetime import datetime
 from enum import Enum
 
+
+def _get_int(d: dict, attr: str):
+    """returns the attribute of the dict,
+       converted to integer
+
+       if key is not in dict, return None
+
+       if value is a string, but NaN, exception is raused
+    """
+
+    val = d.get(attr, None)
+    return int(val) if val else None
 
 class State(Enum):
     VICTIM_STATEMENT = 0
@@ -14,102 +26,88 @@ class State(Enum):
 
 
 class Driver:
-    def __init__(self):
-        self.name = ""
-        self.number = 0
-        self.u_id = 0
+    def __init__(self, json={}):
+
+        if not json:
+            json = {}
+
+        self.name = json.get('name', '')
+        self.number = json.get('number', 0)
+        self.u_id = int(json.get('u_id', 0))
+
+    def _to_json(self):
+        d = dict()
+
+        d['name'] = self.name
+        d['number'] = self.number
+        d['u_id'] = str(self.u_id)
+
+        return d
 
 
 class Incident:
-    def __init__(self):
-        self.race_name = ""
-        self.infringement = ""
-        self.outcome = ""
+    def __init__(self, json={}):
 
-        self.channel_id = None
-        self.offender = None
-        self.victim = None
-        self.lap = 0
-        self.state = State.VICTIM_STATEMENT
-        self.last_msg = datetime.datetime.utcnow().timestamp()
-        self.locked_time = 0
-        self.cleanup_queue = []
+        if not json:
+            json = {}
 
+        self.g_id = _get_int(json, 'g_id')
+        self.race_name = json.get('race_name', '')
+        self.infringement = json.get('infringement', '')
+        self.outcome = json.get('outcome', '')
 
-def _driver_to_json(d: Driver):
-    return dict({
-        'name': d.name,
-        'number': d.number,
-        'u_id': d.u_id
-    })
+        self.channel_id = int(json.get('channel_id', '0'))
+        self.lap = json.get('lap', '-')
+        self.state = State(json.get('state', State.VICTIM_STATEMENT.value))
 
+        self.offender = Driver(json.get('offender', {}))
+        self.victim = Driver(json.get('victim', {}))
 
-def _json_to_driver(json):
-    d = Driver()
+        self.locked_time = json.get('locked_time', None)
+        self.last_msg = json.get('last_msg', datetime.utcnow())
 
-    d.name = json.get('name', '')
-    d.number = int(json.get('number', '0'))
-    d.u_id = int(json.get('u_id', '0'))
+        self.cleanup_queue = list(map(int, json.get('cleanup_queue', [])))
 
-    return d
+    def _to_json(self):
 
+        d = dict({
+            'g_id': str(self.g_id),  # must be set, cannot be None
+            'channel_id': str(self.channel_id),
+            'lap': self.lap,
+            'race_name': self.race_name,
+            'infringement': self.infringement,
+            'outcome': self.outcome,
+            'state': self.state.value,
+            'last_msg': self.last_msg,
+            'locked_time': self.locked_time,
+            'cleanup_queue': list(map(str, self.cleanup_queue)),
+            'victim': self.victim._to_json(),
+            'offender': self.offender._to_json()
+        })
 
-
-def _incident_to_json(incident: Incident):
-
-    d = dict({
-        'channel_id': incident.channel_id,
-        'lap': incident.lap,
-        'race_name': incident.race_name,
-        'infringement': incident.infringement,
-        'outcome': incident.outcome,
-        'state': incident.state.value,
-        'last_msg': incident.last_msg,
-        'locked_time': incident.locked_time,
-        'cleanup_queue': incident.cleanup_queue
-    })
-
-    d['victim'] = _driver_to_json(incident.victim)
-    d['offender'] = _driver_to_json(incident.offender)
+        return d
 
 
-    return d
+class Settings:
+    def __init__(self, json={}):
+
+        if not json:
+            json = {}
+
+        self.g_id = _get_int(json, 'g_id')
+        self.incident_section_id = _get_int(json, 'incident_section_id')
+        self.stewards_id = _get_int(json, 'stewards_id')
+        self.statement_ch_id = _get_int(json, 'statement_ch_id')
+        self.log_ch_id = _get_int(json, 'log_ch_id')
 
 
-def _json_to_incident(json):
-    i = Incident()
+    def _to_json(self):
+        d = dict({
+            'g_id': str(self.g_id),  # must not be None
+            'incident_section_id': str(self.incident_section_id) if self.incident_section_id else None,
+            'stewards_id': str(self.stewards_id) if self.stewards_id else None,
+            'statement_ch_id': str(self.statement_ch_id) if self.statement_ch_id else None,
+            'log_ch_id': str(self.log_ch_id) if self.log_ch_id else None
+        })
 
-    i.race_name = json.get('race_name', '')
-    i.infringement = json.get('infringement', '')
-    i.outcome = json.get('outcome', '')
-    i.channel_id = int(json['channel_id'])
-    i.lap = json.get('lap', '')
-    i.state = State(int(json['state']))
-    i.last_msg = float(json['last_msg'])
-    i.locked_time = float(json['locked_time'])
-    i.cleanup_queue = json.get('cleanup_queue', [])
-
-    i.victim = _json_to_driver(json.get('victim', {}))
-    i.offender = _json_to_driver(json.get('offender', {}))
-
-    return i
-
-
-def incidents_to_json(incs: {}):
-
-    incs_dict = dict()
-
-    for i_key in incs:
-        incs_dict[i_key] = _incident_to_json(incs[i_key])
-
-    return incs_dict
-
-
-def json_to_incidents(json):
-
-    incs = {}
-
-    for key in json:
-        incs[int(key)] = _json_to_incident(json[key])
-
-    return incs
+        return d

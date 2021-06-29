@@ -4,6 +4,7 @@ archive/
 **/log.txt
 **/servers.json
 tmp/
+data/
 
 # ---> Python
 # Byte-compiled / optimized / DLL files

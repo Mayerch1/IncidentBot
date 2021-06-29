@@ -27,9 +27,7 @@ from util.interaction import ack_message, get_client_response, get_client_reacti
 from util.displayEmbeds import incident_embed
 
 
-
 class IncidentSetup(commands.Cog):
-
 
     class SetupState(Enum):
         race_name = 0
@@ -124,18 +122,18 @@ class IncidentSetup(commands.Cog):
         perms.manage_permissions = True
         perms.embed_links = True
 
-        server = TinyConnector.get_guild(cmd.guild.id)
+        server = TinyConnector.get_settings(cmd.guild.id)
 
         if not server.incident_section_id:
-            await cmd.send('You need to setup a section for incidents first. Please ask an admin to use `{:s}incident setup`'.format(server.prefix))
+            await cmd.send('You need to setup a section for incidents first. Please ask an admin to use `/incident setup`')
             return
 
         if not server.statement_ch_id:
-            await cmd.send('You need to setup a summary channel for incidents first. Please ask an admin to use `{:s}incident setup`'.format(server.prefix))
+            await cmd.send('You need to setup a summary channel for incidents first. Please ask an admin to use `/incident setup`')
             return
 
         if not server.stewards_id:
-            await cmd.send('No steward role is specified. Please ask an admin to use `{:s}incident setup'.format(server.prefix))
+            await cmd.send('No steward role is specified. Please ask an admin to use `/incident setup')
             return
 
         section = self.client.get_channel(server.incident_section_id)
@@ -206,9 +204,8 @@ class IncidentSetup(commands.Cog):
         success = await self.incident_setup_channel(stm)
 
         if success:
-            server = TinyConnector.get_guild(stm.guild.id)
-            TinyConnector.incr_inc_cnt(server)
-            TinyConnector.update_incident(server.g_id, stm.incident)
+            TinyConnector.incr_inc_cnt(stm.guild.id)
+            TinyConnector.update_incident(stm.incident)
 
             await stm.dm.send('I tagged you in the appropriate incident channel.')
 
@@ -353,9 +350,7 @@ class IncidentSetup(commands.Cog):
         if stm.dm is None:
             return
 
-        incident = Incident()
-        incident.victim = Driver()
-        incident.offender = Driver()
+        incident = Incident({'g_id': ctx.guild.id})
 
         incident.victim.u_id = ctx.author.id
         incident.offender.u_id = offender_id
@@ -432,10 +427,11 @@ class IncidentSetup(commands.Cog):
     async def incident_setup_channel(self, stm):
 
         # need update for incident number, otherwise concurrent access might break sequential numbering
-        server = TinyConnector.get_guild(stm.guild.id)
+        server = TinyConnector.get_settings(stm.guild.id)
+        incident_cnt = TinyConnector.get_inc_cnt(stm.guild.id)
 
         # create channel and ask user for more input
-        ch_name = '🅰 Incident Ticket - {:d}'.format(server.incident_cnt + 1)
+        ch_name = '🅰 Incident Ticket - {:d}'.format(incident_cnt + 1)
 
         section = self.client.get_channel(server.incident_section_id)
         steward_role = stm.guild.get_role(server.stewards_id)
@@ -443,7 +439,7 @@ class IncidentSetup(commands.Cog):
         offender = await stm.guild.fetch_member(stm.incident.offender.u_id)
 
         if section is None:
-            await stm.dm.send('Failed to create a channel, please ask an admin to re-set the category with `{:s}incident setup`'.format(server.prefix))
+            await stm.dm.send('Failed to create a channel, please ask an admin to re-set the category with `/incident setup`')
             return False
 
 

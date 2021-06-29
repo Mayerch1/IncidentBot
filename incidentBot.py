@@ -7,16 +7,6 @@ from util.verboseErrors import VerboseErrors
 from lib.tinyConnector import TinyConnector
 
 
-# define before Data class
-def get_guild_based_prefix(bot, msg: discord.Message):
-    # raise exception if not on DM
-    # effectively ignoring all DMs
-    if isinstance(msg.channel, discord.channel.TextChannel):
-        return TinyConnector.get_guild_prefix(msg.guild.id)
-    else:
-        return '_'
-
-
 intents = discord.Intents.none()
 intents.guilds = True
 intents.members = True
@@ -31,7 +21,7 @@ intents.dm_reactions = True
 
 
 token = open('token.txt', 'r').read()
-client = commands.Bot(command_prefix=get_guild_based_prefix, description='Report an incident to the stewards', intents=intents)
+client = commands.Bot(command_prefix='/', description='Report an incident to the stewards', intents=intents)
 slash = SlashCommand(client, sync_commands=True, override_type=True)
 
 
@@ -63,8 +53,8 @@ async def on_guild_remove(guild):
     TinyConnector._delete_guild(guild.id)
 
 
-
 def main():
+    TinyConnector.init()
     client.load_extension(f'modules.IncidentModule')
     client.load_extension(f'modules.IncidentSetup')
     client.load_extension(f'modules.IncidentSettings')
