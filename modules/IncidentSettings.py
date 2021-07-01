@@ -77,7 +77,7 @@ class IncidentSettings(commands.Cog):
                             ])
     async def incident_setup_steward(self, ctx: SlashContext, mode, role):
 
-        if not ctx.author.guild_permissions.administrator or ctx.author.id == 140149964020908032:
+        if not ctx.author.guild_permissions.administrator:
             await ctx.send('You do not have permissions to execute this command')
             return
 
@@ -121,7 +121,7 @@ class IncidentSettings(commands.Cog):
                                 ])
     async def incident_setup_ticket(self, ctx: SlashContext, mode, channel):
 
-        if not ctx.author.guild_permissions.administrator or ctx.author.id == 140149964020908032:
+        if not ctx.author.guild_permissions.administrator:
             await ctx.send('You do not have permissions to execute this command')
             return
 

@@ -36,9 +36,9 @@ class IncidentSetup(commands.Cog):
         offender_name = 3
         offender_number = 4
         classification = 5
-        lap_corner = 6
-        summary = 7
-        # WARN: update max_enum_val when adding entries
+        classification_other = 6
+        lap_corner = 7
+        summary = 8
 
         # negative numbers will never be hit by the cyclic advance
         exit_abort = -1
@@ -46,9 +46,8 @@ class IncidentSetup(commands.Cog):
         exit_timeout = -3
         exit_unexpected = -4
 
-
         def max_enum_val(self):
-            return 7
+            return max(map(lambda e: e.value, list(IncidentSetup.SetupState)))
 
         def next(self):
             if self.value+1 > self.max_enum_val():
@@ -69,7 +68,7 @@ class IncidentSetup(commands.Cog):
             self.guild = None
             self.author = None
             self.incident = None
-            self.navigation_row = None
+            self.navigation_rows = []
             self.question_msg = None
             self.dm = None
             self.setup_satisfied = False
@@ -174,28 +173,31 @@ class IncidentSetup(commands.Cog):
     async def _abort_stm(self, stm):
         await stm.dm.send('Cancelling ticket. You can start again by reinvoking the command.')
 
-        for c in stm.navigation_row['components']:
-            c['disabled'] = True
+        for n_row in stm.navigation_rows:
+            for c in n_row['components']:
+                c['disabled'] = True
 
-        await stm.question_msg.edit(components=[stm.navigation_row])
+        await stm.question_msg.edit(components=[*stm.navigation_rows])
 
 
     async def _abort_unexpected_stm(self, stm):
         await stm.dm.send('Unexpected error ocurred. Please try again and contact a bot-moderator.')
 
-        for c in stm.navigation_row['components']:
-            c['disabled'] = True
+        for n_row in stm.navigation_rows:
+            for c in n_row['components']:
+                c['disabled'] = True
 
-        await stm.question_msg.edit(components=[stm.navigation_row])
+        await stm.question_msg.edit(components=[*stm.navigation_rows])
 
 
     async def _timeout_stm(self, stm):
         await stm.dm.send('The ticket timeout was exceeded. You can start the process again by reinvoking the command.')
 
-        for c in stm.navigation_row['components']:
-            c['disabled'] = True
+        for n_row in stm.navigation_rows:
+            for c in n_row['components']:
+                c['disabled'] = True
 
-        await stm.question_msg.edit(components=[stm.navigation_row])
+        await stm.question_msg.edit(components=[*stm.navigation_rows])
 
     async def _success_stm(self, stm):
 
@@ -209,10 +211,11 @@ class IncidentSetup(commands.Cog):
 
             await stm.dm.send('I tagged you in the appropriate incident channel.')
 
-        for c in stm.navigation_row['components']:
-            c['disabled'] = True
+        for n_row in stm.navigation_rows:
+            for c in n_row['components']:
+                c['disabled'] = True
 
-        await stm.question_msg.edit(components=[stm.navigation_row])
+        await stm.question_msg.edit(components=[*stm.navigation_rows])
 
 
     def get_question(self, stm):
@@ -231,7 +234,9 @@ class IncidentSetup(commands.Cog):
         elif state == IncidentSetup.SetupState.offender_number:
             return discord.Embed(title=f'({state.value+1}/{l}) State the other drivers number', description='Only digits are allowed')
         elif state == IncidentSetup.SetupState.classification:
-            return discord.Embed(title=f'({state.value+1}/{l}) State the incident classification', description='according to [rule 4.1](https://docs.google.com/document/d/1VJUtz6EFFXpEP-VS2--kDzZks8YcBrUL8xs4Bm9smVk/edit#bookmark=id.r2jbeek7bvkc)')
+            return discord.Embed(title=f'({state.value+1}/{l}) Select the incident classification', description='select `other` if no element in the list describes your incident')
+        elif state == IncidentSetup.SetupState.classification_other:
+            return discord.Embed(title=f'({state.value+1}/{l}) State the incident classification', description='Type your custom classification below')
         elif state == IncidentSetup.SetupState.lap_corner:
             return discord.Embed(title=f'({state.value+1}/{l}) If possible, state the race lap and corner', description='\'-\' if unspecified')
         elif state == IncidentSetup.SetupState.summary:
@@ -271,10 +276,92 @@ class IncidentSetup(commands.Cog):
                 )
             )
 
-        stm.navigation_row = manage_components.create_actionrow(*buttons)
+        stm.navigation_rows = [manage_components.create_actionrow(*buttons)]
+
+        if stm.state == IncidentSetup.SetupState.classification:
+            inc_selection = (
+                manage_components.create_select(
+                    custom_id='setup_navigation_incident_type',
+                    placeholder='Select the Incident type',
+                    min_values=1,
+                    max_values=1,
+                    options=[
+                        manage_components.create_select_option(
+                            label='Impeding a qualifying lap',
+                            value='impeding_qualy'
+                        ),
+                        manage_components.create_select_option(
+                            label='Severe cut',
+                            value='severe_cut',
+                            description='Severe cut with a lasting advantage'
+                        ),
+                        manage_components.create_select_option(
+                            label='Illegal overtake',
+                            value='illegal_overtake'
+                        ),
+                        manage_components.create_select_option(
+                            label='Making Contact',
+                            value='contact_straight',
+                            description='Making Contact on a straight'
+                        ),
+                        manage_components.create_select_option(
+                            label='Rear ending',
+                            value='rear_ending',
+                            description='Rear ending in the braking zone'
+                        ),
+                        manage_components.create_select_option(
+                            label='Move under braking',
+                            value='move_braking',
+                            description='Moving in the braking zone'
+                        ),
+                        manage_components.create_select_option(
+                            label='Multiple Defensive moves',
+                            value='multiple_defence'
+                        ),
+                        manage_components.create_select_option(
+                            label='Failing to respect space',
+                            value='cutting_off',
+                            description='Failing to respect the available space'
+                        ),
+                        manage_components.create_select_option(
+                            label='Slow-Down on racing line',
+                            value='slow_down',
+                            description='Taking a slow-down on the Racing Line'
+                        ),
+                        manage_components.create_select_option(
+                            label='Blocking under blue flags',
+                            value='blue_flags'
+                        ),
+                        manage_components.create_select_option(
+                            label='Forcing off the track',
+                            value='forcing_offtrack'
+                        ),
+                        manage_components.create_select_option(
+                            label='Unsafe Rejoin',
+                            value='unsafe_rejoin',
+                            description='Rejoining the track in an unsafe manner'
+                        ),
+                        manage_components.create_select_option(
+                            label='Failing to wait',
+                            value='fail_to_wait',
+                            description='Failing to wait after causing an incident'
+                        ),
+                        manage_components.create_select_option(
+                            label='Reckless Driving',
+                            value='reckless_driving'
+                        ),
+                        manage_components.create_select_option(
+                            label='Other',
+                            value='other',
+                            description='Enter a custom text, if none of the options apply'
+                        )
+                    ]
+                )
+            )
+            stm.navigation_rows.append(manage_components.create_actionrow(inc_selection))
 
         if stm.question_msg and push_update:
-            await stm.question_msg.edit(components=[stm.navigation_row])
+            await stm.question_msg.edit(components=[*stm.navigation_rows])
 
 
     async def update_messages(self, stm, re_send=False):
@@ -284,7 +371,24 @@ class IncidentSetup(commands.Cog):
             stm.question_msg = await stm.dm.send(content='...')
 
         question_eb = self.get_question(stm)
-        await stm.question_msg.edit(content='', embed=question_eb, components=[stm.navigation_row])
+        await stm.question_msg.edit(content='', embed=question_eb, components=[*stm.navigation_rows])
+
+
+    def classification_selection(self, ctx, stm):
+        sel_id = ctx.selected_options[0]  # only allow a single selection
+
+        # filter the component given the selected id
+        # component must exist, otherwise event couldn't be triggered in the first place
+        opts = ctx.component['options']
+        sel_opt = list(filter(lambda o: o['value'] == sel_id, opts))[0]
+
+        stm.incident.infringement = sel_opt.get('description', None) or sel_opt['label']
+
+        # overskip the other-selection state
+        # if the incident is not other
+        stm.state = stm.state.next()
+        if sel_id != 'other':
+            stm.state = stm.state.next()
 
 
     async def process_navigation(self, ctx, stm):
@@ -296,6 +400,8 @@ class IncidentSetup(commands.Cog):
             stm.state = IncidentSetup.SetupState.exit_success
         elif ctx.component_id == 'setup_navigation_abort':
             stm.state = IncidentSetup.SetupState.exit_abort
+        elif ctx.component_id == 'setup_navigation_incident_type':
+            self.classification_selection(ctx, stm)
 
         await ctx.defer(edit_origin=True)
 
@@ -327,14 +433,18 @@ class IncidentSetup(commands.Cog):
             else:
                 stm.incident.offender.number = int(content)
 
-        elif stm.state == IncidentSetup.SetupState.classification:
+        elif stm.state == IncidentSetup.SetupState.classification_other:
             stm.incident.infringement = content
 
         elif stm.state == IncidentSetup.SetupState.lap_corner:
             stm.incident.lap = content
             stm.setup_satisfied = True
 
-        stm.state = stm.state.next()
+        # these states only allow advancement by components
+        # not by entering a text message
+        if stm.state != IncidentSetup.SetupState.classification:
+            stm.state = stm.state.next()
+
         return True
 
 
@@ -358,7 +468,7 @@ class IncidentSetup(commands.Cog):
         stm.incident = incident
 
         await self.update_navigation(stm)
-        stm.question_msg = await stm.dm.send(content='...', components=[stm.navigation_row])
+        stm.question_msg = await stm.dm.send(content='...', components=[*stm.navigation_rows])
 
         re_send_msg = False
 
@@ -371,7 +481,7 @@ class IncidentSetup(commands.Cog):
             def msg_check(msg):
                 return msg.author.id == stm.dm.recipient.id and msg.channel.id == stm.dm.id
 
-            pending_tasks = [manage_components.wait_for_component(self.client, components=stm.navigation_row, timeout=10*60),
+            pending_tasks = [manage_components.wait_for_component(self.client, components=[*stm.navigation_rows], timeout=10*60),
                             self.client.wait_for('message',check=msg_check)]
 
             done_tasks, pending_tasks = await asyncio.wait(pending_tasks, return_when=asyncio.FIRST_COMPLETED)
