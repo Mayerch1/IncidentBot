@@ -11,8 +11,8 @@ import discord
 from discord.ext import commands, tasks
 from discord_slash import cog_ext, SlashContext, ComponentContext, SlashCommandOptionType
 from discord_slash.utils import manage_components
-from discord_slash.model import SlashCommandOptionType, ButtonStyle
-from discord_slash.utils.manage_commands import create_option, create_choice
+from discord_slash.model import SlashCommandOptionType, SlashCommandPermissionType,ButtonStyle
+from discord_slash.utils.manage_commands import create_option, create_choice, create_permission
 
 
 from lib.tinyConnector import TinyConnector
@@ -48,12 +48,11 @@ class IncidentSettings(commands.Cog):
         print('IncidentSettings loaded')
 
 
-
     # =====================
     # commands functions
     # =====================
 
-    @cog_ext.cog_subcommand(base='incident', subcommand_group='setup', name='roles', description='setup the incident roles (admin)',
+    @cog_ext.cog_subcommand(base='incident_setup', name='roles', description='setup the incident roles (admin)',
                             options=[
                                 create_option(
                                     name='mode',
@@ -75,11 +74,31 @@ class IncidentSettings(commands.Cog):
                                     option_type=SlashCommandOptionType.ROLE
                                 )
                             ])
-    async def incident_setup_steward(self, ctx: SlashContext, mode, role):
+    @cog_ext.permission(guild_id=722746405453692989, # Wolfpack
+                        permissions=[
+                            create_permission(
+                                id=727959973388091522, # Server Member
+                                id_type=SlashCommandPermissionType.ROLE,
+                                permission=False
+                            ),
+                            create_permission(
+                                id=790295518869717022, # Bot Dev
+                                id_type=SlashCommandPermissionType.ROLE,
+                                permission=True
+                            ),
+                            create_permission(
+                                id=727960161087520821, # Moderator
+                                id_type=SlashCommandPermissionType.ROLE,
+                                permission=True
+                            ),
+                            create_permission(
+                                id=727961402035273830, # Owner
+                                id_type=SlashCommandPermissionType.ROLE,
+                                permission=True
+                            )
 
-        if not ctx.author.guild_permissions.administrator:
-            await ctx.send('You do not have permissions to execute this command')
-            return
+                        ])
+    async def incident_setup_steward(self, ctx: SlashContext, mode, role):
 
         if mode == 'steward':
             server = TinyConnector.get_settings(ctx.guild.id)
@@ -89,7 +108,7 @@ class IncidentSettings(commands.Cog):
             await ctx.send(f'New steward role is {role.mention}')
 
 
-    @cog_ext.cog_subcommand(base='incident', subcommand_group='setup', name='channels', description='setup tho incident channels (admin)',
+    @cog_ext.cog_subcommand(base='incident_setup', name='channels', description='setup tho incident channels (admin)',
                                 options=[
                                     create_option(
                                         name='mode',
@@ -121,10 +140,6 @@ class IncidentSettings(commands.Cog):
                                 ])
     async def incident_setup_ticket(self, ctx: SlashContext, mode, channel):
 
-        if not ctx.author.guild_permissions.administrator:
-            await ctx.send('You do not have permissions to execute this command')
-            return
-
         server = TinyConnector.get_settings(ctx.guild.id)
 
         if mode == 'category':
@@ -152,8 +167,6 @@ class IncidentSettings(commands.Cog):
             await ctx.send('The log channel will be `{:s}`'.format(channel.name))
 
         TinyConnector.update_settings(server)
-
-
 
 
 def setup(client):
