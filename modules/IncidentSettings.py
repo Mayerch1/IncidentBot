@@ -77,6 +77,11 @@ class IncidentSettings(commands.Cog):
     @cog_ext.permission(guild_id=722746405453692989, # Wolfpack
                         permissions=[
                             create_permission(
+                                id=722746405453692989, # everyone
+                                id_type=SlashCommandPermissionType.ROLE,
+                                permission=False
+                            ),
+                            create_permission(
                                 id=727959973388091522, # Server Member
                                 id_type=SlashCommandPermissionType.ROLE,
                                 permission=False
