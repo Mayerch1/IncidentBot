@@ -1,4 +1,3 @@
-
 import discord
 from discord.ext import commands
 from discord_slash import SlashCommand, SlashContext
@@ -22,7 +21,7 @@ intents.dm_reactions = True
 
 token = open('token.txt', 'r').read()
 client = commands.Bot(command_prefix='/', description='Report an incident to the stewards', intents=intents)
-slash = SlashCommand(client, sync_commands=True, override_type=True)
+slash = SlashCommand(client, sync_commands=True)
 
 
 PREFIX_HELP = '```prefix <string>\n\n'\

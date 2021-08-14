@@ -10,8 +10,9 @@ from datetime import datetime, timedelta
 import discord
 from discord.ext import commands, tasks
 from discord_slash import cog_ext, SlashContext, ComponentContext, SlashCommandOptionType
+from discord_slash.context import MenuContext
 from discord_slash.utils import manage_components
-from discord_slash.model import SlashCommandOptionType, ButtonStyle
+from discord_slash.model import SlashCommandOptionType, ButtonStyle, ContextMenuType
 from discord_slash.utils.manage_commands import create_option, create_choice
 
 
@@ -160,11 +161,13 @@ class IncidentSetup(commands.Cog):
             await cmd.send(embed = embed)
             return
 
-
         # channel is visible for all
         # cmd.send is not
         await cmd.send('I have sent you a DM to continue the ticket process.')
-        await cmd.channel.send('This incident is now looked at by the stewards. There\'s no need for further discussions in this channel.')
+
+        # do not send for MenuContext
+        if isinstance(cmd, SlashContext):
+            await cmd.channel.send('This incident is now looked at by the stewards. There\'s no need for further discussions in this channel.')
 
         stm.dm = dm
         return
@@ -624,6 +627,16 @@ class IncidentSetup(commands.Cog):
         print('IncidentSetup loaded')
 
 
+    # =====================
+    # context menu functions
+    # =====================
+
+
+    @cog_ext.cog_context_menu(name='Report_Incident', target=ContextMenuType.USER)
+    async def incident_report_context(self, ctx: MenuContext):
+
+        target_id = ctx.target_author.id
+        await self.incident_stm(ctx, int(target_id))
 
     # =====================
     # commands functions
@@ -641,7 +654,6 @@ class IncidentSetup(commands.Cog):
                             ])
     async def incident_report(self, ctx: SlashContext, offender):
         await self.incident_stm(ctx, offender.id)
-
 
 
 def setup(client):

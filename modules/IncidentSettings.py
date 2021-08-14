@@ -65,7 +65,6 @@ class IncidentSettings(commands.Cog):
                                             value='steward'
                                         )
                                     ]
-
                                 ),
                                 create_option(
                                     name='role',
